@@ -17,7 +17,8 @@ export default [
                 window: 'readonly',
                 document: 'readonly',
                 requestAnimationFrame: 'readonly',
-                cancelAnimationFrame: 'readonly'
+                cancelAnimationFrame: 'readonly',
+                location: 'readonly',
             }
         },
         rules: {
