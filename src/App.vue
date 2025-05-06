@@ -1,7 +1,5 @@
 <script setup>
 import * as THREE from "three";
-import img_ayaka from './assets/ayaka.jpg'
-import img_shuye from './assets/shuye.jpg'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js"
@@ -24,7 +22,7 @@ document.querySelector("#app").appendChild(renderer.domElement);
 
 // 图片纹理
 const textureLoader = new THREE.TextureLoader();
-const texture = textureLoader.load(img_shuye);
+const texture = textureLoader.load('/shuye.jpg');
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -34,7 +32,7 @@ directionalLight.position.set(0, 0, 5);
 scene.add(directionalLight);
 
 // 几何体
-const geometry = new THREE.BoxGeometry(1, 1, 1);
+const geometry = new THREE.BoxGeometry()
 
 // 材质
 const material = new THREE.MeshStandardMaterial({
