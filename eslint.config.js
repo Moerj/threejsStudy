@@ -19,6 +19,7 @@ export default [
                 requestAnimationFrame: 'readonly',
                 cancelAnimationFrame: 'readonly',
                 location: 'readonly',
+                console: 'readonly',
             }
         },
         rules: {
