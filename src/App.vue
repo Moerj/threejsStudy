@@ -111,6 +111,7 @@ onBeforeUnmount(() => {
     // 清除几何体和材质
     geometry.dispose()
     material1.dispose()
+    material2.dispose()
     texture1.dispose()
 
     // 清除渲染器
