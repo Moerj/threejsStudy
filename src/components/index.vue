@@ -1,6 +1,7 @@
 <template>
     <div class="box">
         <div class="routeButton" @click="$router.push({ path: '/spheres' })">球体控制</div>
+        <div class="routeButton" @click="$router.push({ path: '/model' })">模型</div>
     </div>
 </template>
 
@@ -22,5 +23,6 @@
         &:hover{
             color:cornflowerblue;
         }
+        margin-bottom: 5px;
     }
 </style>

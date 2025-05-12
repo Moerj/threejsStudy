@@ -3,9 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js"
-
 const container = ref(null)
-
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -20,8 +18,8 @@ renderer.setPixelRatio(window.devicePixelRatio);
 
 // 图片纹理
 const textureLoader = new THREE.TextureLoader();
-const texture1 = textureLoader.load('/shuye.jpg');
-const texture2 = textureLoader.load('/ayaka.jpg');
+const texture1 = textureLoader.load('/img/shuye.jpg');
+const texture2 = textureLoader.load('/img/ayaka.jpg');
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
@@ -51,6 +49,25 @@ positions.forEach((x) => {
     spheres.push(sphere);
     scene.add(sphere);
 });
+
+// 1.直接改变大小
+// 修改第二个球大小
+spheres[1].scale.set(1.5, 1.5, 1.5); // 将第二个球缩放为1.5倍
+
+// 2.修改顶点来改变大小
+// 克隆第二个球的几何体并修改顶点
+// const secondSphereGeometry = geometry.clone();
+// const vertices = secondSphereGeometry.attributes.position;
+// for (let i = 0; i < vertices.count; i++) {
+//     vertices.setXYZ(
+//         i,
+//         vertices.getX(i) * 1.5,
+//         vertices.getY(i) * 1.5,
+//         vertices.getZ(i) * 1.5
+//     );
+// }
+// spheres[1].geometry = secondSphereGeometry;
+
 
 // 坐标辅助器
 const axesHelper = new THREE.AxesHelper(2);
@@ -92,10 +109,12 @@ const cliclHandler = (e) => {
             sphere.material = material1.clone();
         });
 
+        // 点击到的物体
         let obj = intersects[0].object;
         if (obj.isMesh) {
             obj.material.dispose();
             obj.material = material2.clone();
+            console.log(obj);
         }
 
         // 刷新所有球体
@@ -135,8 +154,6 @@ onMounted(() => {
 
 </script>
 
-<style scoped>
-</style>
 <template> 
     <div ref="container">
     </div> 
