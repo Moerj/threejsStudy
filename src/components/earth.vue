@@ -157,21 +157,125 @@ window.addEventListener('mouseup', (event) => {
     isMouseDown = false
 })
 
+// 创建多条抛物线
+function createParabolicCurve(startPoint, endPoint, height) {
+    const points = [];
+    const segments = 50;
+    
+    // 计算起点和终点之间的球面距离
+    const startDir = startPoint.clone().normalize();
+    const endDir = endPoint.clone().normalize();
+    const angle = startDir.angleTo(endDir);
+    
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        
+        // 在球面上进行球面插值
+        const sphericalPoint = new THREE.Vector3().lerpVectors(startDir, endDir, t).normalize();
+        
+        // 添加高度偏移
+        const heightOffset = Math.sin(Math.PI * t) * height; // 使用正弦函数创建平滑的弧度
+        const finalPoint = sphericalPoint.multiplyScalar(1 + heightOffset);
+        
+        points.push(finalPoint);
+    }
+    
+    return new THREE.CatmullRomCurve3(points);
+}
+
+// 创建目标点数组
+const targetPoints = [];
+const radius = 1.0; // 目标点在球面上
+for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const point = new THREE.Vector3(x, 0, z).normalize(); // 确保点在球面上
+    targetPoints.push(point);
+}
+
+// 创建抛物线组
+const curves = [];
+const curveObjects = new THREE.Group();
+earth.add(curveObjects);
+
+targetPoints.forEach((target) => {
+    const startPoint = markerGroup.position.clone().normalize(); // 确保起点在球面上
+    const curve = createParabolicCurve(
+        startPoint,
+        target,
+        0.15 // 统一的高度系数
+    );
+    
+    // 创建渐变材质
+    const gradientTexture = new THREE.CanvasTexture((() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 256, 0);
+        gradient.addColorStop(0, '#00ffff');
+        gradient.addColorStop(1, '#ffffff');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 256, 1);
+        return canvas;
+    })());
+
+    const geometry = new THREE.TubeGeometry(curve, 50, 0.001, 8, false);
+    const material = new THREE.MeshBasicMaterial({
+        map: gradientTexture,
+        transparent: true,
+        opacity: 0.5
+    });
+    
+    const tube = new THREE.Mesh(geometry, material);
+    curveObjects.add(tube);
+    curves.push({
+        curve: curve,
+        mesh: tube
+    });
+});
+
+// 添加光点动画
+const lightPoint = new THREE.Mesh(
+    new THREE.SphereGeometry(0.004, 16, 16),
+    new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        transparent: true,
+        opacity: 0.8
+    })
+);
+earth.add(lightPoint);
+
+// 动画相关变量
+let currentCurveIndex = 0;
+let curveProgress = 0;
+
 function animate() {
     animationFrameId = requestAnimationFrame(animate);
-
+    
     // 地球自转动画
     if (isMouseDown == false) {
-        // earth.rotation.y += 0.005;
+        earth.rotation.y += 0.005;
     }
-
-    // 只缩放外圈
+    
+    // 外圈缩放动画
     scale += 0.01 * scaleDirection;
     if (scale >= 1.3) scaleDirection = -1;
     if (scale <= 0.8) scaleDirection = 1;
-
     ring.scale.set(scale, scale, 1);
-
+    
+    // 光点沿曲线运动
+    curveProgress += 0.01;
+    if (curveProgress >= 1) {
+        curveProgress = 0;
+        currentCurveIndex = (currentCurveIndex + 1) % curves.length;
+    }
+    
+    const currentCurve = curves[currentCurveIndex].curve;
+    const point = currentCurve.getPoint(curveProgress);
+    lightPoint.position.copy(point);
+    
     renderer.render(scene, camera);
 }
 animate()

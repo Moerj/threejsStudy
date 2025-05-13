@@ -3,8 +3,8 @@
     <div class="routeButton" @click="$router.push({ path: '/spheres' })">
       球体控制
     </div>
-    <div class="routeButton" @click="$router.push({ path: '/model' })">
-      模型
+    <div class="routeButton" @click="$router.push({ path: '/earth' })">
+      地球模型
     </div>
   </div>
 </template>

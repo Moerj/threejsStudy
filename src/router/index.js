@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import index from '../components/index.vue'
 import spheres from '../components/spheres.vue'
-import model from '../components/model.vue'
+import earth from '../components/earth.vue'
 
 const routes = [
     {
@@ -17,8 +17,8 @@ const routes = [
         component: spheres
     },
     {
-        path: '/model',
-        component: model
+        path: '/earth',
+        component: earth
     }
 ]
 
