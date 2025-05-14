@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { disposeAll } from "@/assets/disposeAll.js";
+import  * as TWEEN  from "three/examples/jsm/libs/tween.module.js";
 
 const gui = new GUI();
 
@@ -103,6 +104,14 @@ class CreateMarker {
 
         ring.name = "ring";
         ring._index = this.index
+
+        // 圆环动画
+        const tween = new TWEEN.Tween(ring.scale)
+            .to({x: 2, y: 2}, 1000)
+            .easing(TWEEN.Easing.Quadratic.InOut)
+            .repeat(Infinity)
+            .yoyo(true)
+            .start();
 
         this.markerGroup = new THREE.Group();
         this.markerGroup.add(marker);
@@ -240,6 +249,8 @@ let animationFrameId
 function animate() {
     animationFrameId = requestAnimationFrame(animate);
 
+    TWEEN.update() //刷新补间动画
+
     // 地球自转动画
     // if (isMouseDown == false) {
     //     earth.rotation.y += 0.005;
@@ -267,6 +278,9 @@ onBeforeUnmount(() => {
     renderer.domElement.remove();
     controls.dispose();
     gui.destroy();
+    
+    // 销毁tween补间动画
+    TWEEN.removeAll();
 
     // 清理事件监听
     window.removeEventListener('mousedown', handleMouseDown);
