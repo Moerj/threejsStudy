@@ -205,8 +205,8 @@ class CreateParabola {
 const parabolas = [];
 for (let i = 1; i < markers.length; i++) {
     const parabola = new CreateParabola(
-        { latitude: markers[0].latitude, longitude: markers[0].longitude },
-        { latitude: markers[i].latitude, longitude: markers[i].longitude }
+        { latitude: markers[0].latitude, longitude: markers[0].longitude },//飞线起点
+        { latitude: markers[i].latitude, longitude: markers[i].longitude } //飞线终点
     );
     parabolas.push(parabola);
     earth.add(parabola);
