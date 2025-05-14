@@ -39,20 +39,22 @@ const geometrySize = 32
 const geometry = new THREE.SphereGeometry(1, geometrySize, geometrySize)
 const material = new THREE.MeshStandardMaterial({
     map: atmos,            // 基础颜色贴图
-    emissiveMap: points,   // 点位光斑效果
-    emissive: 0xfaffdc,    // 自发光颜色
-    emissiveIntensity: 0.5,// 自发光强度
-    roughness: 1,          // 粗糙度
-    metalness: 0,           // 金属度
+    normalMap: outline,    // 使用轮廓图作为法线贴图
+    roughnessMap: specular,// 使用高光贴图作为粗糙度贴图
+    roughness: 0.8,       // 基础粗糙度
+    metalness: 0.1,       // 金属度
+    emissiveMap: outline, // 使用轮廓图作为发光贴图
+    emissive: 0x3366ff,  // 发光颜色（蓝色）
+    emissiveIntensity: 0.3, // 发光强度
 });
 const sphere = new THREE.Mesh(geometry, material);
 
 // 发光边缘层
 const glowGeometry = new THREE.SphereGeometry(1.001, geometrySize, geometrySize);
 const glowMaterial = new THREE.MeshStandardMaterial({
-    map: outline,          // 使用outline作为基础贴图
-    emissiveMap: specular,  // 使用outline作为发光贴图
-    emissive: 0x6699ff,   // 发光颜色（淡蓝色）
+    map: points,
+    emissiveMap: points,  // 使用outline作为发光贴图
+    emissive: 0xffffff,   // 发光颜色（淡蓝色）
     emissiveIntensity: 0.8,  // 发光强度
     transparent: true,     // 启用透明
     opacity: 0.3,         // 设置透明度
@@ -86,9 +88,12 @@ const markers = []
 
 // 创建一个点位
 class CreateMarker {
-    index; // 添加索引属性
-
+    index 
+    latitude
+    longitude
     constructor(latitude, longitude) {
+        this.latitude = latitude
+        this.longitude = longitude
         this.index = markers.length; // 保存当前marker的索引
         const marker = new THREE.Mesh(markerGeometry, markerMaterial.clone());
         const ring = new THREE.Mesh(ringGeometry, ringMaterial.clone());
@@ -135,6 +140,76 @@ markers[3] = new CreateMarker(50, 25)
 markers.forEach(marker => {
     earth.add(marker.get())
 });
+
+// 创建抛物线
+class CreateParabola {
+    constructor(startPosition, endPosition) {
+        // 将经纬度转换为三维坐标
+        const startPoint = new THREE.Vector3();
+        startPoint.setFromSphericalCoords(
+            1.005,
+            THREE.MathUtils.degToRad(90 - startPosition.latitude),
+            THREE.MathUtils.degToRad(startPosition.longitude)
+        );
+
+        const endPoint = new THREE.Vector3();
+        endPoint.setFromSphericalCoords(
+            1.005,
+            THREE.MathUtils.degToRad(90 - endPosition.latitude),
+            THREE.MathUtils.degToRad(endPosition.longitude)
+        );
+
+        // 计算中点并向外偏移作为控制点
+        const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
+        midPoint.normalize().multiplyScalar(1.2); // 控制抛物线的高度
+
+        // 创建曲线
+        const curve = new THREE.QuadraticBezierCurve3(
+            startPoint,
+            midPoint,
+            endPoint
+        );
+
+        // 创建曲线的点
+        const points = curve.getPoints(50);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+        // 创建渐变色顶点颜色
+        const colors = new Float32Array(points.length * 3);
+        for (let i = 0; i < points.length; i++) {
+            const alpha = i / points.length;
+            // 从橙色渐变到青色
+            colors[i * 3] = 1 - alpha; // R
+            colors[i * 3 + 1] = 0.3 + alpha * 0.4; // G
+            colors[i * 3 + 2] = alpha; // B
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        // 创建材质
+        const material = new THREE.LineBasicMaterial({
+            vertexColors: true, // 启用顶点颜色
+            transparent: true,
+            opacity: 0.8,
+            linewidth: 2,
+        });
+
+        // 创建线条
+        this.line = new THREE.Line(geometry, material);
+        
+        return this.line;
+    }
+}
+
+// 添加创建抛物线的示例代码
+const parabolas = [];
+for (let i = 1; i < markers.length; i++) {
+    const parabola = new CreateParabola(
+        { latitude: markers[0].latitude, longitude: markers[0].longitude },
+        { latitude: markers[i].latitude, longitude: markers[i].longitude }
+    );
+    parabolas.push(parabola);
+    earth.add(parabola);
+}
 
 // gui调试marker
 const markerPosition = {
