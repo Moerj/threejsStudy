@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from "three/examples/jsm/libs/lil-gui.module.min.js"
+import { disposeAll } from "@/assets/disposeAll.js";
+
 const container = ref(null)
 const scene = new THREE.Scene();
 
@@ -131,15 +133,9 @@ onBeforeUnmount(() => {
     // 停止动画循环
     cancelAnimationFrame(animationFrameId)
 
-    // 清除几何体和材质
-    geometry.dispose()
-    material1.dispose()
-    material2.dispose()
-    texture1.dispose()
+    disposeAll(scene)
 
-    // 清除渲染器
     renderer.dispose()
-    // 移除渲染器的 DOM 元素
     renderer.domElement.remove()
 
     controls.dispose()

@@ -5,19 +5,9 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
+import { disposeAll } from "@/assets/disposeAll.js";
 
 const gui = new GUI();
-
-
-const container = ref(null)
-onMounted(() => {
-    // 使用 ref 引用获取当前组件的 div 元素
-    container.value.appendChild(renderer.domElement);
-})
-onBeforeUnmount(() => {
-    location.reload()
-})
-
 
 const scene = new THREE.Scene();
 
@@ -149,12 +139,11 @@ const controls = new OrbitControls(camera, renderer.domElement)
 
 let isMouseDown = false
 
-window.addEventListener('mousedown', (event) => {
-    isMouseDown = true
-})
-window.addEventListener('mouseup', (event) => {
-    isMouseDown = false
-})
+const handleMouseDown = () => isMouseDown = true;
+const handleMouseUp = () => isMouseDown = false;
+
+window.addEventListener('mousedown', handleMouseDown);
+window.addEventListener('mouseup', handleMouseUp);
 
 let animationFrameId
 function animate() {
@@ -165,10 +154,33 @@ function animate() {
     //     earth.rotation.y += 0.005;
     // }
 
-
     renderer.render(scene, camera);
 }
 animate()
+
+
+const container = ref(null)
+onMounted(() => {
+    // 使用 ref 引用获取当前组件的 div 元素
+    container.value.appendChild(renderer.domElement);
+})
+
+
+// 替换原有的 onBeforeUnmount
+onBeforeUnmount(() => {
+    cancelAnimationFrame(animationFrameId);// 停止动画循环
+    
+    // 释放所有资源
+    disposeAll(scene);
+    renderer.dispose();
+    renderer.domElement.remove();
+    controls.dispose();
+    gui.destroy();
+
+    // 清理事件监听
+    window.removeEventListener('mousedown', handleMouseDown);
+    window.removeEventListener('mouseup', handleMouseUp);
+})
 </script>
 
 <template>

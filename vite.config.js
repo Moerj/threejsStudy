@@ -6,4 +6,9 @@ export default defineConfig({
   plugins: [vue()],
   publicDir: 'public',
   srcDir: 'src',
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  }
 })
