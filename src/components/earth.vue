@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { disposeAll } from "@/assets/disposeAll.js";
-import  * as TWEEN  from "three/examples/jsm/libs/tween.module.js";
+// import  * as TWEEN  from "three/examples/jsm/libs/tween.module.js";
 
 const gui = new GUI();
 
@@ -104,14 +104,6 @@ class CreateMarker {
 
         ring.name = "ring";
         ring._index = this.index
-
-        // 圆环动画
-        const tween = new TWEEN.Tween(ring.scale)
-            .to({x: 2, y: 2}, 1000)
-            .easing(TWEEN.Easing.Quadratic.InOut)
-            .repeat(Infinity)
-            .yoyo(true)
-            .start();
 
         this.markerGroup = new THREE.Group();
         this.markerGroup.add(marker);
@@ -249,12 +241,36 @@ let animationFrameId
 function animate() {
     animationFrameId = requestAnimationFrame(animate);
 
-    TWEEN.update() //刷新补间动画
+    // TWEEN.update() //刷新补间动画
 
     // 地球自转动画
     // if (isMouseDown == false) {
     //     earth.rotation.y += 0.005;
     // }
+
+    // 点位圆环动画
+    markers.forEach(marker => {
+        const ring = marker.get().getObjectByName('ring');
+        // 如果没有缩放方向属性，初始化为1（放大）
+        if (ring.scaleDirection === undefined) {
+            ring.scaleDirection = 1;
+        }
+        
+        // 根据方向进行缩放
+        if (ring.scaleDirection === 1) {
+            ring.scale.x += 0.01;
+            ring.scale.y += 0.01;
+            if (ring.scale.x >= 1.5) {
+                ring.scaleDirection = -1;
+            }
+        } else {
+            ring.scale.x -= 0.01;
+            ring.scale.y -= 0.01;
+            if (ring.scale.x <= 0.5) {
+                ring.scaleDirection = 1;
+            }
+        }
+    });
 
     renderer.render(scene, camera);
 }
