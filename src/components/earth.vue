@@ -82,11 +82,22 @@ const ringMaterial = new THREE.MeshBasicMaterial({
     opacity: 0.6
 });
 
+const markers = []
+
 // 创建一个点位
 class CreateMarker {
+    index; // 添加索引属性
+
     constructor(latitude, longitude) {
-        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        this.index = markers.length; // 保存当前marker的索引
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial.clone());
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+
+        marker.name = "marker";
+        marker._index = this.index
+
+        ring.name = "ring";
+        ring._index = this.index
 
         this.markerGroup = new THREE.Group();
         this.markerGroup.add(marker);
@@ -112,8 +123,14 @@ class CreateMarker {
     }
 }
 
-const markers = []
+//飞线发射点
 markers[0] = new CreateMarker(52.2, -1.8)
+markers[0].get().getObjectByName('ring').material.color.setHex(0xfb5108)
+
+// 飞线终点
+markers[1] = new CreateMarker(61, -32)
+markers[2] = new CreateMarker(32.24, 0)
+markers[3] = new CreateMarker(50, 25)
 
 markers.forEach(marker => {
     earth.add(marker.get())
@@ -138,7 +155,6 @@ const controls = new OrbitControls(camera, renderer.domElement)
 // controls.enableDamping = true //旋转阻尼
 
 let isMouseDown = false
-
 const handleMouseDown = () => isMouseDown = true;
 const handleMouseUp = () => isMouseDown = false;
 
