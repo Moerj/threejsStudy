@@ -145,6 +145,8 @@ markers.forEach(marker => {
 // 创建抛物线
 class CreateParabola {
     constructor(startPosition, endPosition) {
+        const glowSegmentLength = 15;
+        
         // 将经纬度转换为三维坐标
         const startPoint = new THREE.Vector3();
         startPoint.setFromSphericalCoords(
@@ -160,34 +162,15 @@ class CreateParabola {
             THREE.MathUtils.degToRad(endPosition.longitude)
         );
 
-        // 计算中点并向外偏移作为控制点
+        // 计算控制点
         const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
         midPoint.normalize().multiplyScalar(1.2);
 
-        // 创建曲线
+        // 创建单一的曲线实例
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
 
-        // 在起点前添加额外的点
-        const startExtraPoints = [];
-        const firstPoint = points[0];
-        const startDirection = points[1].clone().sub(firstPoint).normalize().multiplyScalar(-1);
-        for (let i = 1; i <= 10; i++) {
-            startExtraPoints.push(firstPoint.clone().add(startDirection.multiplyScalar(0.05)));
-        }
-
-        // 在终点后添加额外的点
-        const endExtraPoints = [];
-        const lastPoint = points[points.length - 1];
-        const endDirection = lastPoint.clone().sub(points[points.length - 2]).normalize();
-        for (let i = 1; i <= 10; i++) {
-            endExtraPoints.push(lastPoint.clone().add(endDirection.multiplyScalar(0.05)));
-        }
-
-        // 合并所有点
-        const allPoints = [...startExtraPoints.reverse(), ...points, ...endExtraPoints];
-
-        // 创建基础曲线（只使用原始点，不包括延长部分）
+        // 创建基础曲线
         const baseGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const baseMaterial = new THREE.LineBasicMaterial({
             color: 'rgb(179, 207, 255)',
@@ -196,15 +179,15 @@ class CreateParabola {
         });
         this.baseLine = new THREE.Line(baseGeometry, baseMaterial);
 
-        // 创建发光线段
-        const glowSegmentLength = 15; // 控制发光线段长度
-        const glowGeometry = new THREE.BufferGeometry().setFromPoints(allPoints.slice(0, glowSegmentLength)); // 只使用前5个点
+        // 创建发光线段（使用同一条曲线的点）
+        const glowGeometry = new THREE.BufferGeometry();
         const glowMaterial = new THREE.LineBasicMaterial({
             color: 'rgb(20, 251, 47)',
             transparent: true,
             opacity: 0.8
         });
         this.glowLine = new THREE.Line(glowGeometry, glowMaterial);
+        this.glowLine.geometry.setFromPoints(points.slice(0, glowSegmentLength));
 
         // 创建组合对象
         this.group = new THREE.Group();
@@ -213,10 +196,10 @@ class CreateParabola {
 
         // 添加动画属性
         this.group.userData = {
+            curve,
             progress: 0,
-            speed: 0.01,
-            points: allPoints,
-            glowSegmentLength,// 存储发光段长度
+            speed: 0.005,
+            glowSegmentLength
         };
 
         return this.group;
@@ -298,17 +281,22 @@ function animate() {
     parabolas.forEach(group => {
         if (group.userData) {
             group.userData.progress += group.userData.speed;
-            if (group.userData.progress >= 1.2) { // 延长动画周期
+            if (group.userData.progress >= 1) {
                 group.userData.progress = 0;
             }
 
-            const points = group.userData.points;
-            const glowSegmentLength = group.userData.glowSegmentLength;
-            const currentIndex = Math.floor(group.userData.progress * (points.length - glowSegmentLength));
-            const glowLine = group.children[1];
+            // 获取曲线上的准确点位
+            const currentPoints = [];
+            const segmentLength = group.userData.glowSegmentLength;
             
-            // 更新发光线段的位置
-            const currentPoints = points.slice(currentIndex, currentIndex + glowSegmentLength);
+            for (let i = 0; i < segmentLength; i++) {
+                const t = (group.userData.progress + (i / (segmentLength * 5)));
+                if (t <= 1) {
+                    currentPoints.push(group.userData.curve.getPoint(t));
+                }
+            }
+            
+            const glowLine = group.children[1];
             glowLine.geometry.setFromPoints(currentPoints);
         }
     });
