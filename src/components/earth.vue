@@ -162,42 +162,45 @@ class CreateParabola {
 
         // 计算中点并向外偏移作为控制点
         const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
-        midPoint.normalize().multiplyScalar(1.2); // 控制抛物线的高度
+        midPoint.normalize().multiplyScalar(1.2);
 
         // 创建曲线
-        const curve = new THREE.QuadraticBezierCurve3(
-            startPoint,
-            midPoint,
-            endPoint
-        );
-
-        // 创建曲线的点
+        const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
-        // 创建渐变色顶点颜色
-        const colors = new Float32Array(points.length * 3);
-        for (let i = 0; i < points.length; i++) {
-            const alpha = i / points.length;
-            // 从橙色渐变到青色
-            colors[i * 3] = 1 - alpha; // R
-            colors[i * 3 + 1] = 0.3 + alpha * 0.4; // G
-            colors[i * 3 + 2] = alpha; // B
-        }
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-        // 创建材质
-        const material = new THREE.LineBasicMaterial({
-            vertexColors: true, // 启用顶点颜色
+        // 创建基础曲线
+        const baseGeometry = new THREE.BufferGeometry().setFromPoints(points);
+        const baseMaterial = new THREE.LineBasicMaterial({
+            color: 'rgb(179, 207, 255)',
             transparent: true,
-            opacity: 0.8,
-            linewidth: 2,
+            opacity: 0.2
         });
+        this.baseLine = new THREE.Line(baseGeometry, baseMaterial);
 
-        // 创建线条
-        this.line = new THREE.Line(geometry, material);
-        
-        return this.line;
+        // 创建发光线段
+        const glowSegmentLength = 15; // 控制发光线段长度
+        const glowGeometry = new THREE.BufferGeometry().setFromPoints(points.slice(0, glowSegmentLength)); // 只使用前5个点
+        const glowMaterial = new THREE.LineBasicMaterial({
+            color: 'rgb(20, 251, 47)',
+            transparent: true,
+            opacity: 0.8
+        });
+        this.glowLine = new THREE.Line(glowGeometry, glowMaterial);
+
+        // 创建组合对象
+        this.group = new THREE.Group();
+        this.group.add(this.baseLine);
+        this.group.add(this.glowLine);
+
+        // 添加动画属性
+        this.group.userData = {
+            progress: 0,
+            speed: 0.01,
+            points,
+            glowSegmentLength,// 存储发光段长度
+        };
+
+        return this.group;
     }
 }
 
@@ -272,6 +275,25 @@ function animate() {
         }
     });
 
+    // 更新抛物线动画
+    parabolas.forEach(group => {
+        if (group.userData) {
+            group.userData.progress += group.userData.speed;
+            if (group.userData.progress >= 1) {
+                group.userData.progress = 0;
+            }
+
+            const points = group.userData.points;
+            const glowSegmentLength = group.userData.glowSegmentLength;
+            const currentIndex = Math.floor(group.userData.progress * (points.length - glowSegmentLength));
+            const glowLine = group.children[1];
+            
+            // 更新发光线段的位置
+            const currentPoints = points.slice(currentIndex, currentIndex + glowSegmentLength);
+            glowLine.geometry.setFromPoints(currentPoints);
+        }
+    });
+
     renderer.render(scene, camera);
 }
 animate()
@@ -296,7 +318,7 @@ onBeforeUnmount(() => {
     gui.destroy();
     
     // 销毁tween补间动画
-    TWEEN.removeAll();
+    // TWEEN.removeAll();
 
     // 清理事件监听
     window.removeEventListener('mousedown', handleMouseDown);
