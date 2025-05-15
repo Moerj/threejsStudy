@@ -168,16 +168,26 @@ class CreateParabola {
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
 
-        // 增加额外的点以延长曲线
-        const extraPoints = [];
-        const lastPoint = points[points.length - 1];
-        const direction = lastPoint.clone().sub(points[points.length - 2]).normalize();
+        // 在起点前添加额外的点
+        const startExtraPoints = [];
+        const firstPoint = points[0];
+        const startDirection = points[1].clone().sub(firstPoint).normalize().multiplyScalar(-1);
         for (let i = 1; i <= 10; i++) {
-            extraPoints.push(lastPoint.clone().add(direction.multiplyScalar(0.05 * i)));
+            startExtraPoints.push(firstPoint.clone().add(startDirection.multiplyScalar(0.05)));
         }
-        const allPoints = [...points, ...extraPoints];
 
-        // 创建基础曲线
+        // 在终点后添加额外的点
+        const endExtraPoints = [];
+        const lastPoint = points[points.length - 1];
+        const endDirection = lastPoint.clone().sub(points[points.length - 2]).normalize();
+        for (let i = 1; i <= 10; i++) {
+            endExtraPoints.push(lastPoint.clone().add(endDirection.multiplyScalar(0.05)));
+        }
+
+        // 合并所有点
+        const allPoints = [...startExtraPoints.reverse(), ...points, ...endExtraPoints];
+
+        // 创建基础曲线（只使用原始点，不包括延长部分）
         const baseGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const baseMaterial = new THREE.LineBasicMaterial({
             color: 'rgb(179, 207, 255)',
