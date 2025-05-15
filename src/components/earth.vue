@@ -168,6 +168,15 @@ class CreateParabola {
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
 
+        // 增加额外的点以延长曲线
+        const extraPoints = [];
+        const lastPoint = points[points.length - 1];
+        const direction = lastPoint.clone().sub(points[points.length - 2]).normalize();
+        for (let i = 1; i <= 10; i++) {
+            extraPoints.push(lastPoint.clone().add(direction.multiplyScalar(0.05 * i)));
+        }
+        const allPoints = [...points, ...extraPoints];
+
         // 创建基础曲线
         const baseGeometry = new THREE.BufferGeometry().setFromPoints(points);
         const baseMaterial = new THREE.LineBasicMaterial({
@@ -179,7 +188,7 @@ class CreateParabola {
 
         // 创建发光线段
         const glowSegmentLength = 15; // 控制发光线段长度
-        const glowGeometry = new THREE.BufferGeometry().setFromPoints(points.slice(0, glowSegmentLength)); // 只使用前5个点
+        const glowGeometry = new THREE.BufferGeometry().setFromPoints(allPoints.slice(0, glowSegmentLength)); // 只使用前5个点
         const glowMaterial = new THREE.LineBasicMaterial({
             color: 'rgb(20, 251, 47)',
             transparent: true,
@@ -196,7 +205,7 @@ class CreateParabola {
         this.group.userData = {
             progress: 0,
             speed: 0.01,
-            points,
+            points: allPoints,
             glowSegmentLength,// 存储发光段长度
         };
 
@@ -279,7 +288,7 @@ function animate() {
     parabolas.forEach(group => {
         if (group.userData) {
             group.userData.progress += group.userData.speed;
-            if (group.userData.progress >= 1) {
+            if (group.userData.progress >= 1.2) { // 延长动画周期
                 group.userData.progress = 0;
             }
 
