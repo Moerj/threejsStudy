@@ -151,8 +151,8 @@ class CreateParabola {
         const startPoint = new THREE.Vector3();
         startPoint.setFromSphericalCoords(
             1.005,
-            THREE.MathUtils.degToRad(90 - startPosition.latitude),
-            THREE.MathUtils.degToRad(startPosition.longitude)
+            THREE.MathUtils.degToRad(90 - startPosition.latitude),// 纬度角度转弧度
+            THREE.MathUtils.degToRad(startPosition.longitude)// 经度角度转弧度
         );
 
         const endPoint = new THREE.Vector3();
