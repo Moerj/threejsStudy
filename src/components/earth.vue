@@ -1,11 +1,14 @@
 <script setup>
 import * as THREE from "three";
-// import { GLTFLoader } from "three/examples/jsm/Addons.js";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { disposeAll } from "@/assets/disposeAll.js";
-// import  * as TWEEN  from "three/examples/jsm/libs/tween.module.js";
+
+// 引入高级线段函数
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 
 const gui = new GUI();
 
@@ -144,8 +147,6 @@ markers.forEach(marker => {
 // 创建抛物线
 class CreateParabola {
     constructor(startPosition, endPosition) {
-        const glowSegmentLength = 15;
-        
         // 将经纬度转换为三维坐标
         const startPoint = new THREE.Vector3();
         startPoint.setFromSphericalCoords(
@@ -186,14 +187,20 @@ class CreateParabola {
         this.baseLine = new THREE.Line(baseGeometry, baseMaterial);
 
         // 创建发光线段（使用同一条曲线的点）
-        const glowGeometry = new THREE.BufferGeometry();
-        const glowMaterial = new THREE.LineBasicMaterial({
-            color: 'rgb(20, 251, 47)',
-            transparent: true,
-            opacity: 0.8
-        });
-        this.glowLine = new THREE.Line(glowGeometry, glowMaterial);
-        this.glowLine.geometry.setFromPoints(points.slice(0, glowSegmentLength));
+        const glowGeometry = new LineGeometry();
+        const glowMaterial = new LineMaterial({
+            color: 0x14fb2f,
+            linewidth: 4, // in pixels
+            vertexColors: false,
+            resolution:  new THREE.Vector2(window.innerWidth,window.innerHeight),// 设置分辨率
+            dashed: false,
+            opacity: 0.8,
+            transparent: true
+        })
+
+        const glowLineLength = 15;
+        this .glowLine = new Line2(glowGeometry, glowMaterial);
+        this.glowLine.geometry.setFromPoints(points.slice(0, glowLineLength));
 
         // 创建组合对象
         this.group = new THREE.Group();
@@ -201,11 +208,11 @@ class CreateParabola {
         this.group.add(this.glowLine);
 
         // 添加动画属性
-        this.group.userData = {
+        this.group.animate = {
             curve,
             progress: 0,
             speed: 0.005,
-            glowSegmentLength
+            glowLineLength
         };
 
         return this.group;
@@ -285,25 +292,28 @@ function animate() {
 
     // 更新抛物线动画
     parabolas.forEach(group => {
-        if (group.userData) {
-            group.userData.progress += group.userData.speed;
-            if (group.userData.progress >= 1) {
-                group.userData.progress = 0;
+        if (group.animate) {
+            group.animate.progress += group.animate.speed;
+            if (group.animate.progress >= 1) {
+                group.animate.progress = 0;
             }
 
             // 获取曲线上的准确点位
             const currentPoints = [];
-            const segmentLength = group.userData.glowSegmentLength;
+            const segmentLength = group.animate.glowLineLength;
             
             for (let i = 0; i < segmentLength; i++) {
-                const t = (group.userData.progress + (i / (segmentLength * 5)));
+                const t = (group.animate.progress + (i / (segmentLength * 5)));
                 if (t <= 1) {
-                    currentPoints.push(group.userData.curve.getPoint(t));
+                    currentPoints.push(group.animate.curve.getPoint(t));
                 }
             }
             
-            const glowLine = group.children[1];
-            glowLine.geometry.setFromPoints(currentPoints);
+            // 更新发光线段的几何体
+            if (currentPoints.length > 0) {
+                const glowLine = group.children[1];
+                glowLine.geometry.setFromPoints(currentPoints);
+            }
         }
     });
 
