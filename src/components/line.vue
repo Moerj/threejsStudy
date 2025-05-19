@@ -1,11 +1,16 @@
 <!-- 飞线学习 -->
  <script setup>
-import * as THREE from "three";
-// import { GLTFLoader } from "three/examples/jsm/Addons.js";
+ import * as THREE from "three";
+import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
-import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { disposeAll } from "@/assets/disposeAll.js";
+
+// 引入高级线段函数
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
+
 const gui = new GUI();
 const scene = new THREE.Scene();
 
@@ -46,14 +51,19 @@ const baseMaterial = new THREE.LineBasicMaterial({
 const baseLine = new THREE.Line(baseGeometry, baseMaterial);
 scene.add(baseLine)
 
+
 // 创建发光线段（使用同一条曲线的点）
-const glowGeometry = new THREE.BufferGeometry();
-const glowMaterial = new THREE.LineBasicMaterial({
-    color: 'rgb(20, 251, 47)',
-    transparent: true,
-    opacity: 0.8
-});
-const glowLine = new THREE.Line(glowGeometry, glowMaterial);
+const glowGeometry = new LineGeometry();
+const glowMaterial = new LineMaterial({
+    color: 0x14fb2f,
+    linewidth: 4, // in pixels
+    vertexColors: false,
+    resolution:  new THREE.Vector2(window.innerWidth,window.innerHeight),// 设置分辨率
+    dashed: false,
+    opacity: 0.8,
+    transparent: true
+})
+const glowLine = new Line2(glowGeometry, glowMaterial);
 // 初始化发光线段长度（设置为总点数的1/3）
 const glowLineLength = Math.floor(points.length / 3);
 glowLine.geometry.setFromPoints(points.slice(0, glowLineLength));
@@ -96,7 +106,7 @@ function testPoint() {
     scene.add(endPointMesh);
     scene.add(midPointMesh);
 }
-testPoint()
+// testPoint()
 
 let animationFrameId
 function animate() {
@@ -126,7 +136,9 @@ function animate() {
     }
     
     // 更新发光线段的几何体
-    glowLine.geometry.setFromPoints(currentPoints);
+    if (currentPoints.length > 0) {
+        glowLine.geometry.setFromPoints(currentPoints);
+    }
 
     // 渲染场景
     renderer.render(scene, camera);
