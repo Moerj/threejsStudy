@@ -6,6 +6,9 @@
     <div class="routeButton" @click="$router.push({ path: '/earth' })">
       地球模型
     </div>
+    <div class="routeButton" @click="$router.push({ path: '/line' })">
+      飞线
+    </div>
   </div>
 </template>
 

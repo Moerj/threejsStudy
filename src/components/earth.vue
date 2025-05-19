@@ -1,4 +1,3 @@
-<!-- 加载模型 -->
 <script setup>
 import * as THREE from "three";
 // import { GLTFLoader } from "three/examples/jsm/Addons.js";
@@ -164,6 +163,13 @@ class CreateParabola {
 
         // 计算控制点
         const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5);
+        /*想象一下：
+        如果两点在地球表面
+        它们的中点会在地球内部
+        normalize() 会把这个中点拉到地球表面
+        multiplyScalar(1.2) 会继续往外拉伸20%
+        这样就形成了一个向外凸起的控制点，使得飞线呈现弧形
+        */
         midPoint.normalize().multiplyScalar(1.2);
 
         // 创建单一的曲线实例
