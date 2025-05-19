@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 import { disposeAll } from "@/assets/disposeAll.js";
-
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // 引入高级线段函数
 import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -29,6 +29,16 @@ const renderer = new THREE.WebGLRenderer({
 })
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
+
+
+// 在 gui 声明后添加全局变量
+// const gltfLoader = new GLTFLoader();
+// let waterDropModel = null;
+
+// // 加载水滴模型
+// gltfLoader.load('/model/waterDrop.glb', (gltf) => {
+//     waterDropModel = gltf.scene.children[0];
+// });
 
 // 创建几何球
 const textureLoader = new THREE.TextureLoader();
@@ -199,7 +209,7 @@ class CreateParabola {
         })
 
         const glowLineLength = 15;
-        this .glowLine = new Line2(glowGeometry, glowMaterial);
+        this.glowLine = new Line2(glowGeometry, glowMaterial);
         this.glowLine.geometry.setFromPoints(points.slice(0, glowLineLength));
 
         // 创建组合对象
