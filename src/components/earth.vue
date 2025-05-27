@@ -101,7 +101,7 @@ const markers = []
 
 // 创建一个点位
 class CreateMarker {
-    index 
+    index
     latitude
     longitude
     constructor(latitude, longitude) {
@@ -136,7 +136,7 @@ class CreateMarker {
         );
         this.markerGroup.lookAt(0, 0, 0);
     }
-    get(){
+    get() {
         return this.markerGroup
     }
 }
@@ -202,7 +202,7 @@ class CreateParabola {
             color: 0x14fb2f,
             linewidth: 4, // in pixels
             vertexColors: false,
-            resolution:  new THREE.Vector2(window.innerWidth,window.innerHeight),// 设置分辨率
+            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),// 设置分辨率
             dashed: false,
             opacity: 0.8,
             transparent: true
@@ -268,14 +268,14 @@ const mouseUpPoint = new THREE.Vector3();
 // 射线
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
-const getMouseXYonEarth = (e) => {
+const getMouseOnEarthPoint = (e) => {
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
     // 使用一个新的原点和方向来更新射线。
     raycaster.setFromCamera(mouse, camera)
-     // 只检测主地球球体,不检测其他对象
+    // 只检测主地球球体,不检测其他对象
     const intersects = raycaster.intersectObject(sphere);
-    if(intersects.length > 0) {
+    if (intersects.length > 0) {
         // 获取交点
         const point = intersects[0].point;
         // 返回标准化的点(因为地球半径为1)
@@ -297,21 +297,30 @@ const rotateEarthWithAnimation = (start, end) => {
     const worldStart = start.clone();
     const worldEnd = end.clone();
 
-    /*  将起点和终点转换到地球局部坐标系
-        1.使用 clone() 复制向量，避免修改原始向量
-        2.使用 matrixWorld.invert() 将世界坐标转换到地球的局部坐标系*/
+    /*NOTE 
+    世界坐标到局部坐标的转换
+        1.获取地球的世界变换矩阵
+        2.求逆矩阵
+        3.将世界坐标点转换为地球局部坐标系中的点
+        就像把一个"全球GPS坐标"转换成"相对于地球中心的坐标"。
+
+    实际用处
+        在进行对象自身旋转时，使用局部坐标更直观
+        在处理父子关系的对象时，子对象的位置和旋转都是相对于父对象的
+        进行碰撞检测时，常常需要将世界坐标转换到物体的局部坐标进行计算
+    */
     const earthMatrix = earth.matrixWorld.clone().invert();
-    worldStart.applyMatrix4(earthMatrix);
-    worldEnd.applyMatrix4(earthMatrix);
+    const earthSurfacePointStart = worldStart.applyMatrix4(earthMatrix);
+    const earthSurfacePointEnd = worldEnd.applyMatrix4(earthMatrix);
 
     const rotationAxis = new THREE.Vector3()
-        .crossVectors(worldStart, worldEnd)
+        .crossVectors(earthSurfacePointStart, earthSurfacePointEnd)
         .normalize();
-    const angle = Math.acos(worldStart.dot(worldEnd));
+    const angle = Math.acos(earthSurfacePointStart.dot(earthSurfacePointEnd));
 
     // 如果角度太小，不执行旋转
     if (Math.abs(angle) < 0.01) return;
-    
+
     let speed = 5 // 初始速度
     let deceleration = 0.97; // 减速因子(每帧减速3%)
     let lastTime = performance.now();//使用 performance.now() 来计算时间差，使动画更流畅
@@ -320,10 +329,10 @@ const rotateEarthWithAnimation = (start, end) => {
         const currentTime = performance.now();
         const deltaTime = (currentTime - lastTime) / 1000;
         lastTime = currentTime;
-        
+
         // 应用减速
         speed *= deceleration;
-        
+
         // 当速度足够小时停止动画
         if (speed < 0.01) {
             earthRotateAnimation = null;
@@ -331,11 +340,11 @@ const rotateEarthWithAnimation = (start, end) => {
         }
 
         earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
-        
+
         // 存储当前动画的ID
         earthRotateAnimation = requestAnimationFrame(animate);
     }
-    
+
     animate()// 开始新的动画
 }
 
@@ -343,16 +352,16 @@ let isMouseDown = false //当前鼠标按下状态
 
 const handleMouseDown = (e) => {
     isMouseDown = true
-    const point = getMouseXYonEarth(e)
+    const point = getMouseOnEarthPoint(e)
     if (point) {
-        mouseDownPoint.copy(point)
+        mouseDownPoint.copy(point) //鼠标按下时对应地球表面的三位向量点
     }
 }
 const handleMouseUp = (e) => {
     isMouseDown = false
-    const point = getMouseXYonEarth(e)
+    const point = getMouseOnEarthPoint(e)
     if (point) {
-        mouseUpPoint.copy(point)
+        mouseUpPoint.copy(point) //鼠标抬起时对应地球表面的三位向量点
         // 计算旋转
         rotateEarthWithAnimation(mouseDownPoint, mouseUpPoint)
     }
@@ -381,7 +390,7 @@ function animate() {
         if (ring.scaleDirection === undefined) {
             ring.scaleDirection = 1;
         }
-        
+
         // 根据方向进行缩放
         if (ring.scaleDirection === 1) {
             ring.scale.x += 0.01;
@@ -409,14 +418,14 @@ function animate() {
             // 获取曲线上的准确点位
             const currentPoints = [];
             const segmentLength = group.animate.glowLineLength;
-            
+
             for (let i = 0; i < segmentLength; i++) {
                 const t = (group.animate.progress + (i / (segmentLength * 5)));
                 if (t <= 1) {
                     currentPoints.push(group.animate.curve.getPoint(t));
                 }
             }
-            
+
             // 更新发光线段的几何体
             if (currentPoints.length > 0) {
                 const glowLine = group.children[1];
@@ -444,14 +453,14 @@ onBeforeUnmount(() => {
     if (earthRotateAnimation) {
         cancelAnimationFrame(earthRotateAnimation);
     }
-    
+
     // 释放所有资源
     disposeAll(scene);
     renderer.dispose();
     renderer.domElement.remove();
     controls.dispose();
     gui.destroy();
-    
+
     // 销毁tween补间动画
     // TWEEN.removeAll();
 
