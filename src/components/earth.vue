@@ -252,22 +252,120 @@ gui.add(markerPosition, 'longitude', -180, 180).onChange(() => {
     markers[0].setPosition(markerPosition.latitude, markerPosition.longitude)
 });
 
-// const axesHelper = new THREE.AxesHelper(2);
-// scene.add(axesHelper);
+const axesHelper = new THREE.AxesHelper(2);
+scene.add(axesHelper);
 // 新建控制器
 const controls = new OrbitControls(camera, renderer.domElement)
-// controls.enableDamping = true //旋转阻尼
+controls.enableDamping = true //旋转阻尼
+controls.enableRotate = false; // 禁用旋转
+// controls.enableZoom = false;   // 禁用缩放
+// controls.enablePan = false;    // 禁用平移
 
-let isMouseDown = false
-const handleMouseDown = () => isMouseDown = true;
-const handleMouseUp = () => isMouseDown = false;
+// 添加两个变量来存储起始点和结束点
+const mouseDownPoint = new THREE.Vector3();
+const mouseUpPoint = new THREE.Vector3();
+
+// 射线
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+const getMouseXYonEarth = (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
+    // 使用一个新的原点和方向来更新射线。
+    raycaster.setFromCamera(mouse, camera)
+     // 只检测主地球球体,不检测其他对象
+    const intersects = raycaster.intersectObject(sphere);
+    if(intersects.length > 0) {
+        // 获取交点
+        const point = intersects[0].point;
+        // 返回标准化的点(因为地球半径为1)
+        return point.normalize();
+    }
+    return null;
+}
+
+// 添加一个变量来存储当前的动画ID
+let earthRotateAnimation = null;
+// 地球旋转
+const rotateEarthWithAnimation = (start, end) => {
+    // 如果存在正在进行的动画，立即取消
+    if (earthRotateAnimation) {
+        cancelAnimationFrame(earthRotateAnimation);
+        earthRotateAnimation = null;
+    }
+    // 获取世界坐标系中的方向
+    const worldStart = start.clone();
+    const worldEnd = end.clone();
+
+    /*  将起点和终点转换到地球局部坐标系
+        1.使用 clone() 复制向量，避免修改原始向量
+        2.使用 matrixWorld.invert() 将世界坐标转换到地球的局部坐标系*/
+    const earthMatrix = earth.matrixWorld.clone().invert();
+    worldStart.applyMatrix4(earthMatrix);
+    worldEnd.applyMatrix4(earthMatrix);
+
+    const rotationAxis = new THREE.Vector3()
+        .crossVectors(worldStart, worldEnd)
+        .normalize();
+    const angle = Math.acos(worldStart.dot(worldEnd));
+
+    // 如果角度太小，不执行旋转
+    if (Math.abs(angle) < 0.01) return;
+    
+    let speed = 5 // 初始速度
+    let deceleration = 0.97; // 减速因子(每帧减速3%)
+    let lastTime = performance.now();//使用 performance.now() 来计算时间差，使动画更流畅
+
+    const animate = () => {
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
+        
+        // 应用减速
+        speed *= deceleration;
+        
+        // 当速度足够小时停止动画
+        if (speed < 0.01) {
+            earthRotateAnimation = null;
+            return;
+        }
+
+        earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
+        
+        // 存储当前动画的ID
+        earthRotateAnimation = requestAnimationFrame(animate);
+    }
+    
+    animate()// 开始新的动画
+}
+
+let isMouseDown = false //当前鼠标按下状态
+
+const handleMouseDown = (e) => {
+    isMouseDown = true
+    const point = getMouseXYonEarth(e)
+    if (point) {
+        mouseDownPoint.copy(point)
+    }
+}
+const handleMouseUp = (e) => {
+    isMouseDown = false
+    const point = getMouseXYonEarth(e)
+    if (point) {
+        mouseUpPoint.copy(point)
+        // 计算旋转
+        rotateEarthWithAnimation(mouseDownPoint, mouseUpPoint)
+    }
+}
 
 window.addEventListener('mousedown', handleMouseDown);
 window.addEventListener('mouseup', handleMouseUp);
 
-let animationFrameId
+
+// 动画
+let baseAnimateion
 function animate() {
-    animationFrameId = requestAnimationFrame(animate);
+    baseAnimateion = requestAnimationFrame(animate);
 
     // TWEEN.update() //刷新补间动画
 
@@ -341,7 +439,11 @@ onMounted(() => {
 
 // 替换原有的 onBeforeUnmount
 onBeforeUnmount(() => {
-    cancelAnimationFrame(animationFrameId);// 停止动画循环
+    cancelAnimationFrame(baseAnimateion);// 停止动画循环
+
+    if (earthRotateAnimation) {
+        cancelAnimationFrame(earthRotateAnimation);
+    }
     
     // 释放所有资源
     disposeAll(scene);
