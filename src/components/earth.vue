@@ -503,12 +503,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
     cancelAnimationFrame(baseAnimateion);// 停止动画循环
 
-    markers.forEach(marker => {
-        marker.destroy()
-    })
-    parabolas.forEach(parabola => {
-        parabola.destroy()
-    })
+    markers.forEach(marker => { marker.destroy() })
+    parabolas.forEach(parabola => { parabola.destroy() })
+    earthRotate.destroy()
 
     // 释放所有资源
     disposeAll(scene)
@@ -516,7 +513,6 @@ onBeforeUnmount(() => {
     renderer.domElement.remove()
     controls.dispose()
     gui.destroy()
-    earthRotate.destroy() //清理地球的旋转监听
 })
 </script>
 
