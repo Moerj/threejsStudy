@@ -82,34 +82,49 @@ earth.add(glowSphere);
 earth.rotation.x = THREE.MathUtils.degToRad(30) // 设置整体倾斜角度（30度）
 scene.add(earth);
 
-// 创建贴合球面的标记点
-const markerGeometry = new THREE.CircleGeometry(0.005, 32);
-const markerMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    side: THREE.DoubleSide
-});
-// 点位外圈
-const ringGeometry = new THREE.RingGeometry(0.008, 0.01, 32);
-const ringMaterial = new THREE.MeshBasicMaterial({
-    color: 0x00ffff,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.6
-});
-
 const markers = []
 
 // 创建一个点位
-class CreateMarker {
+class Marker {
     index
     latitude
     longitude
+
+    // 创建贴合球面的标记点
+    markerGeometry = new THREE.CircleGeometry(0.005, 32);
+    markerMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide
+    });
+    // 点位外圈
+    ringGeometry = new THREE.RingGeometry(0.008, 0.01, 32);
+    ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+    });
+
+    destroy(){
+        // 1. 释放 Three.js 资源
+        this.markerGeometry.dispose()
+        this.markerMaterial.dispose()
+        this.ringGeometry.dispose()
+        this.ringMaterial.dispose()
+
+        // 2. 清空引用，帮助垃圾回收
+        this.markerGeometry = null;
+        this.ringGeometry = null;
+        this.markerMaterial = null;
+        this.ringMaterial = null;
+        this.markerGroup = null;
+    }
     constructor(latitude, longitude) {
         this.latitude = latitude
         this.longitude = longitude
         this.index = markers.length; // 保存当前marker的索引
-        const marker = new THREE.Mesh(markerGeometry, markerMaterial.clone());
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+        const marker = new THREE.Mesh(this.markerGeometry, this.markerMaterial);
+        const ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial);
 
         marker.name = "marker";
         marker._index = this.index
@@ -142,20 +157,20 @@ class CreateMarker {
 }
 
 //飞线发射点
-markers[0] = new CreateMarker(52.2, -1.8)
+markers[0] = new Marker(52.2, -1.8)
 markers[0].get().getObjectByName('ring').material.color.setHex(0xfb5108)
 
 // 飞线终点
-markers[1] = new CreateMarker(61, -32)
-markers[2] = new CreateMarker(32.24, 0)
-markers[3] = new CreateMarker(50, 25)
+markers[1] = new Marker(61, -32)
+markers[2] = new Marker(32.24, 0)
+markers[3] = new Marker(50, 25)
 
 markers.forEach(marker => {
     earth.add(marker.get())
 });
 
 // 创建抛物线
-class CreateParabola {
+class Parabola {
     constructor(startPosition, endPosition) {
         // 将经纬度转换为三维坐标
         const startPoint = new THREE.Vector3();
@@ -232,7 +247,7 @@ class CreateParabola {
 // 添加创建抛物线的示例代码
 const parabolas = [];
 for (let i = 1; i < markers.length; i++) {
-    const parabola = new CreateParabola(
+    const parabola = new Parabola(
         { latitude: markers[0].latitude, longitude: markers[0].longitude },//飞线起点
         { latitude: markers[i].latitude, longitude: markers[i].longitude } //飞线终点
     );
@@ -471,6 +486,10 @@ onBeforeUnmount(() => {
     if (earthRotate.animation) {
         cancelAnimationFrame(earthRotate.animation);
     }
+
+    markers.forEach(marker => {
+        marker.destroy()
+    });
 
     // 释放所有资源
     disposeAll(scene)
