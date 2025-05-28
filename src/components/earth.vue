@@ -195,9 +195,8 @@ class Parabola {
         transparent: true
     })
 
-    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
-    glowLine = new Line2(this.glowGeometry, this.glowMaterial)
-    
+    lineGroup = new THREE.Group()
+
     destroy(){
         this.animation && cancelAnimationFrame(this.animation)
 
@@ -240,6 +239,13 @@ class Parabola {
         */
         midPoint.normalize().multiplyScalar(1.2);
 
+        const baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
+        const glowLine = new Line2(this.glowGeometry, this.glowMaterial)
+
+        // 创建组合对象
+        this.lineGroup.add(baseLine);
+        this.lineGroup.add(glowLine);
+
         // 创建单一的曲线实例
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
@@ -273,18 +279,11 @@ class Parabola {
             }
 
             if (currentPoints.length > 0) {
-                this.glowLine.geometry.setFromPoints(currentPoints);
+                glowLine.geometry.setFromPoints(currentPoints);
             }
         }
         
         glowLineAnimation();
-
-        // 创建组合对象
-        this.group = new THREE.Group();
-        this.group.add(this.baseLine);
-        this.group.add(this.glowLine);
-
-        return this.group;
     }
 }
 
@@ -295,8 +294,8 @@ for (let i = 1; i < markers.length; i++) {
         { latitude: markers[0].latitude, longitude: markers[0].longitude },//飞线起点
         { latitude: markers[i].latitude, longitude: markers[i].longitude } //飞线终点
     );
-    parabolas.push(parabola);
-    earth.add(parabola);
+    parabolas.push(parabola.lineGroup);
+    earth.add(parabola.lineGroup);
 }
 
 // gui调试marker
