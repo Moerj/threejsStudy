@@ -119,12 +119,14 @@ class Marker {
         this.ringMaterial = null;
         this.markerGroup = null;
     }
-    constructor(latitude, longitude) {
+    constructor(latitude, longitude, ringColor) {
         this.latitude = latitude
         this.longitude = longitude
         this.index = markers.length; // 保存当前marker的索引
         const marker = new THREE.Mesh(this.markerGeometry, this.markerMaterial);
         const ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial);
+
+        if (ringColor) this.ringMaterial.color.setHex(ringColor)
 
         marker.name = "marker";
         marker._index = this.index
@@ -157,8 +159,8 @@ class Marker {
 }
 
 //飞线发射点
-markers[0] = new Marker(52.2, -1.8)
-markers[0].get().getObjectByName('ring').material.color.setHex(0xfb5108)
+markers[0] = new Marker(52.2, -1.8, 0xfb5108)
+// markers[0].get().getObjectByName('ring').material.color.setHex(0xfb5108)
 
 // 飞线终点
 markers[1] = new Marker(61, -32)
@@ -171,6 +173,46 @@ markers.forEach(marker => {
 
 // 创建抛物线
 class Parabola {
+    animation=null
+
+    // 创建基础曲线
+    baseGeometry = new THREE.BufferGeometry()
+    baseMaterial = new THREE.LineBasicMaterial({
+        color: 'rgb(179, 207, 255)',
+        transparent: true,
+        opacity: 0.2
+    });
+
+    // 创建发光线段（使用同一条曲线的点）
+    glowGeometry = new LineGeometry();
+    glowMaterial = new LineMaterial({
+        color: 0x14fb2f,
+        linewidth: 4, // in pixels
+        vertexColors: false,
+        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),// 设置分辨率
+        dashed: false,
+        opacity: 0.8,
+        transparent: true
+    })
+
+    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
+    glowLine = new Line2(this.glowGeometry, this.glowMaterial)
+    
+    destroy(){
+        this.animation && cancelAnimationFrame(this.animation)
+
+        this.baseGeometry.dispose()
+        this.baseGeometry = null;
+
+        this.baseMaterial.dispose()
+        this.baseMaterial = null
+
+        this.glowGeometry.dispose()
+        this.glowGeometry = null
+
+        this.glowMaterial.dispose()
+        this.glowMaterial = null
+    }
     constructor(startPosition, endPosition) {
         // 将经纬度转换为三维坐标
         const startPoint = new THREE.Vector3();
@@ -202,43 +244,45 @@ class Parabola {
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
 
-        // 创建基础曲线
-        const baseGeometry = new THREE.BufferGeometry().setFromPoints(points);
-        const baseMaterial = new THREE.LineBasicMaterial({
-            color: 'rgb(179, 207, 255)',
-            transparent: true,
-            opacity: 0.2
-        });
-        this.baseLine = new THREE.Line(baseGeometry, baseMaterial);
+        // 设置基础线的点
+        this.baseGeometry.setFromPoints(points);
 
-        // 创建发光线段（使用同一条曲线的点）
-        const glowGeometry = new LineGeometry();
-        const glowMaterial = new LineMaterial({
-            color: 0x14fb2f,
-            linewidth: 4, // in pixels
-            vertexColors: false,
-            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),// 设置分辨率
-            dashed: false,
-            opacity: 0.8,
-            transparent: true
-        })
+        // 设置发光线长度
+        const totalPoints = points.length;
+        const glowLineLength = Math.floor(totalPoints * 0.5); // 设置为总长度的一半
 
-        const glowLineLength = 15;
-        this.glowLine = new Line2(glowGeometry, glowMaterial);
-        this.glowLine.geometry.setFromPoints(points.slice(0, glowLineLength));
+        // 发光飞线动画
+        let progress = 0;
+        const speed = 0.005;
+        const glowLineAnimation = () => {
+            
+            this.animation = requestAnimationFrame(glowLineAnimation);
+
+            progress += speed;
+            if (progress >= 1) {
+                progress = 0;
+            }
+
+            const currentPoints = [];
+            // 计算当前应该显示的点的数量
+            for (let i = 0; i < glowLineLength; i++) {
+                const t = (progress + (i / totalPoints));
+                if (t <= 1) {
+                    currentPoints.push(curve.getPoint(t));
+                }
+            }
+
+            if (currentPoints.length > 0) {
+                this.glowLine.geometry.setFromPoints(currentPoints);
+            }
+        }
+        
+        glowLineAnimation();
 
         // 创建组合对象
         this.group = new THREE.Group();
         this.group.add(this.baseLine);
         this.group.add(this.glowLine);
-
-        // 添加动画属性
-        this.group.animate = {
-            curve,
-            progress: 0,
-            speed: 0.005,
-            glowLineLength
-        };
 
         return this.group;
     }
@@ -281,7 +325,8 @@ controls.enableRotate = false; // 禁用旋转
 class earthRotateControl {
     static outData = {
         camera: null,
-        sphere: null
+        sphere: null,
+        earth: null
     }
 
     // 添加两个变量来存储起始点和结束点
@@ -293,7 +338,10 @@ class earthRotateControl {
     #mouse = new THREE.Vector2()
 
     // 添加一个变量来存储当前的动画ID
-    animation = null
+    controlAnimation = null
+    rotateSelfAnimation = null
+
+    #isControlAnimating = false
 
     isMouseDown = false //当前鼠标按下状态
 
@@ -317,15 +365,31 @@ class earthRotateControl {
     }
 
     constructor(data) {
-        earthRotateControl.outData.camera = data.camera;
-        earthRotateControl.outData.sphere = data.sphere;
+        earthRotateControl.outData.camera = data.camera
+        earthRotateControl.outData.sphere = data.sphere
+        earthRotateControl.outData.earth = data.earth
 
         window.addEventListener('mousedown', this.#handleMouseDown);
         window.addEventListener('mouseup', this.#handleMouseUp);
+
+        // 地球开始自转
+        const rotateSelf = () => {
+            // 地球自转动画
+            if (!this.isMouseDown && !this.#isControlAnimating) {
+                earth.rotation.y += 0.002;
+            }
+
+            this.rotateSelfAnimation = requestAnimationFrame(rotateSelf)
+        }
+        rotateSelf()
     }
     destroy() {
         window.removeEventListener('mousedown', this.#handleMouseDown);
         window.removeEventListener('mouseup', this.#handleMouseUp);
+
+        // 停止动画
+        this.controlAnimation && cancelAnimationFrame(this.controlAnimation)
+        this.rotateSelfAnimation && cancelAnimationFrame(this.rotateSelfAnimation)
     }
     getMouseOnEarthPoint = (e) => {
         this.#mouse.x = (e.clientX / window.innerWidth) * 2 - 1
@@ -344,9 +408,9 @@ class earthRotateControl {
     }
     rotateEarthWithAnimation = (start, end) => {
         // 如果存在正在进行的动画，立即取消
-        if (this.animation) {
-            cancelAnimationFrame(this.animation);
-            this.animation = null;
+        if (this.controlAnimation) {
+            cancelAnimationFrame(this.controlAnimation);
+            this.controlAnimation = null;
         }
         // 获取世界坐标系中的方向
         const worldStart = start.clone();
@@ -390,31 +454,28 @@ class earthRotateControl {
 
             // 当速度足够小时停止动画
             if (speed < 0.01) {
-                this.animation = null;
+                this.controlAnimation = null;
+                this.#isControlAnimating = false
                 return;
             }
 
+            const earth = earthRotateControl.outData.earth
             earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
 
-            // 存储当前动画的ID
-            this.animation = requestAnimationFrame(animate);
+            this.#isControlAnimating = true
+            this.controlAnimation = requestAnimationFrame(animate);
         }
 
         animate()// 开始新的动画
     }
 }
-const earthRotate = new earthRotateControl({camera, sphere})
+const earthRotate = new earthRotateControl({camera, sphere, earth})
 
 
 // 动画
 let baseAnimateion
 function animate() {
     baseAnimateion = requestAnimationFrame(animate);
-
-    // 地球自转动画
-    // if (earthRotate.isMouseDown == false) {
-    //     earth.rotation.y += 0.005;
-    // }
 
     // 点位圆环动画
     markers.forEach(marker => {
@@ -440,33 +501,6 @@ function animate() {
         }
     });
 
-    // 更新抛物线动画
-    parabolas.forEach(group => {
-        if (group.animate) {
-            group.animate.progress += group.animate.speed;
-            if (group.animate.progress >= 1) {
-                group.animate.progress = 0;
-            }
-
-            // 获取曲线上的准确点位
-            const currentPoints = [];
-            const segmentLength = group.animate.glowLineLength;
-
-            for (let i = 0; i < segmentLength; i++) {
-                const t = (group.animate.progress + (i / (segmentLength * 5)));
-                if (t <= 1) {
-                    currentPoints.push(group.animate.curve.getPoint(t));
-                }
-            }
-
-            // 更新发光线段的几何体
-            if (currentPoints.length > 0) {
-                const glowLine = group.children[1];
-                glowLine.geometry.setFromPoints(currentPoints);
-            }
-        }
-    });
-
     renderer.render(scene, camera);
 }
 animate()
@@ -483,12 +517,11 @@ onMounted(() => {
 onBeforeUnmount(() => {
     cancelAnimationFrame(baseAnimateion);// 停止动画循环
 
-    if (earthRotate.animation) {
-        cancelAnimationFrame(earthRotate.animation);
-    }
-
     markers.forEach(marker => {
         marker.destroy()
+    });
+    parabolas.forEach(parabola => {
+        parabola.destroy()
     });
 
     // 释放所有资源
