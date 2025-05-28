@@ -261,114 +261,134 @@ controls.enableRotate = false; // 禁用旋转
 // controls.enableZoom = false;   // 禁用缩放
 // controls.enablePan = false;    // 禁用平移
 
-// 添加两个变量来存储起始点和结束点
-const mouseDownPoint = new THREE.Vector3();
-const mouseUpPoint = new THREE.Vector3();
 
-// 射线
-const raycaster = new THREE.Raycaster()
-const mouse = new THREE.Vector2()
-const getMouseOnEarthPoint = (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
-    // 使用一个新的原点和方向来更新射线。
-    raycaster.setFromCamera(mouse, camera)
-    // 只检测主地球球体,不检测其他对象
-    const intersects = raycaster.intersectObject(sphere);
-    if (intersects.length > 0) {
-        // 获取交点
-        const point = intersects[0].point;
-        // 返回标准化的点(因为地球半径为1)
-        return point.normalize();
+// 鼠标控制地球旋转
+class earthRotateControl {
+    static outData = {
+        camera: null,
+        sphere: null
     }
-    return null;
-}
 
-// 添加一个变量来存储当前的动画ID
-let earthRotateAnimation = null;
-// 地球旋转
-const rotateEarthWithAnimation = (start, end) => {
-    // 如果存在正在进行的动画，立即取消
-    if (earthRotateAnimation) {
-        cancelAnimationFrame(earthRotateAnimation);
-        earthRotateAnimation = null;
+    // 添加两个变量来存储起始点和结束点
+    #mouseDownPoint = new THREE.Vector3()
+    #mouseUpPoint = new THREE.Vector3()
+
+    // 射线
+    #raycaster = new THREE.Raycaster()
+    #mouse = new THREE.Vector2()
+
+    // 添加一个变量来存储当前的动画ID
+    animation = null
+
+    isMouseDown = false //当前鼠标按下状态
+
+    #handleMouseDown = (e) => {
+        this.isMouseDown = true
+        const point = this.getMouseOnEarthPoint(e)
+        if (point) {
+            //鼠标按下时对应地球表面的三位向量点
+            this.#mouseDownPoint.copy(point) 
+        }
     }
-    // 获取世界坐标系中的方向
-    const worldStart = start.clone();
-    const worldEnd = end.clone();
+    #handleMouseUp = (e) => {
+        this.isMouseDown = false
+        const point = this.getMouseOnEarthPoint(e)
+        if (point) {
+            //鼠标抬起时对应地球表面的三位向量点
+            this.#mouseUpPoint.copy(point) 
+            // 计算旋转
+            this.rotateEarthWithAnimation(this.#mouseDownPoint, this.#mouseUpPoint)
+        }
+    }
 
-    /*NOTE 
-    世界坐标到局部坐标的转换
-        1.获取地球的世界变换矩阵
-        2.求逆矩阵
-        3.将世界坐标点转换为地球局部坐标系中的点
-        就像把一个"全球GPS坐标"转换成"相对于地球中心的坐标"。
+    constructor(data) {
+        earthRotateControl.outData.camera = data.camera;
+        earthRotateControl.outData.sphere = data.sphere;
 
-    实际用处
-        在进行对象自身旋转时，使用局部坐标更直观
-        在处理父子关系的对象时，子对象的位置和旋转都是相对于父对象的
-        进行碰撞检测时，常常需要将世界坐标转换到物体的局部坐标进行计算
-    */
-    const earthMatrix = earth.matrixWorld.clone().invert();
-    const earthSurfacePointStart = worldStart.applyMatrix4(earthMatrix);
-    const earthSurfacePointEnd = worldEnd.applyMatrix4(earthMatrix);
+        window.addEventListener('mousedown', this.#handleMouseDown);
+        window.addEventListener('mouseup', this.#handleMouseUp);
+    }
+    destroy() {
+        window.removeEventListener('mousedown', this.#handleMouseDown);
+        window.removeEventListener('mouseup', this.#handleMouseUp);
+    }
+    getMouseOnEarthPoint = (e) => {
+        this.#mouse.x = (e.clientX / window.innerWidth) * 2 - 1
+        this.#mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
+        // 使用一个新的原点和方向来更新射线。
+        this.#raycaster.setFromCamera(this.#mouse, earthRotateControl.outData.camera)
+        // 只检测主地球球体,不检测其他对象
+        const intersects = this.#raycaster.intersectObject(earthRotateControl.outData.sphere);
+        if (intersects.length > 0) {
+            // 获取交点
+            const point = intersects[0].point;
+            // 返回标准化的点(因为地球半径为1)
+            return point.normalize();
+        }
+        return null;
+    }
+    rotateEarthWithAnimation = (start, end) => {
+        // 如果存在正在进行的动画，立即取消
+        if (this.animation) {
+            cancelAnimationFrame(this.animation);
+            this.animation = null;
+        }
+        // 获取世界坐标系中的方向
+        const worldStart = start.clone();
+        const worldEnd = end.clone();
 
-    const rotationAxis = new THREE.Vector3()
-        .crossVectors(earthSurfacePointStart, earthSurfacePointEnd)
-        .normalize();
-    const angle = Math.acos(earthSurfacePointStart.dot(earthSurfacePointEnd));
+        /*NOTE 
+        世界坐标到局部坐标的转换
+            1.获取地球的世界变换矩阵
+            2.求逆矩阵
+            3.将世界坐标点转换为地球局部坐标系中的点
+            就像把一个"全球GPS坐标"转换成"相对于地球中心的坐标"。
 
-    // 如果角度太小，不执行旋转
-    if (Math.abs(angle) < 0.01) return;
+        实际用处
+            在进行对象自身旋转时，使用局部坐标更直观
+            在处理父子关系的对象时，子对象的位置和旋转都是相对于父对象的
+            进行碰撞检测时，常常需要将世界坐标转换到物体的局部坐标进行计算
+        */
+        const earthMatrix = earth.matrixWorld.clone().invert();
+        const earthSurfacePointStart = worldStart.applyMatrix4(earthMatrix);
+        const earthSurfacePointEnd = worldEnd.applyMatrix4(earthMatrix);
 
-    let speed = 5 // 初始速度
-    let deceleration = 0.97; // 减速因子(每帧减速3%)
-    let lastTime = performance.now();//使用 performance.now() 来计算时间差，使动画更流畅
+        const rotationAxis = new THREE.Vector3()
+            .crossVectors(earthSurfacePointStart, earthSurfacePointEnd)
+            .normalize();
+        const angle = Math.acos(earthSurfacePointStart.dot(earthSurfacePointEnd));
 
-    const animate = () => {
-        const currentTime = performance.now();
-        const deltaTime = (currentTime - lastTime) / 1000;
-        lastTime = currentTime;
+        // 如果角度太小，不执行旋转
+        if (Math.abs(angle) < 0.01) return;
 
-        // 应用减速
-        speed *= deceleration;
+        let speed = 5 // 初始速度
+        let deceleration = 0.97; // 减速因子(每帧减速3%)
+        let lastTime = performance.now();//使用 performance.now() 来计算时间差，使动画更流畅
 
-        // 当速度足够小时停止动画
-        if (speed < 0.01) {
-            earthRotateAnimation = null;
-            return;
+        const animate = () => {
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            // 应用减速
+            speed *= deceleration;
+
+            // 当速度足够小时停止动画
+            if (speed < 0.01) {
+                this.animation = null;
+                return;
+            }
+
+            earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
+
+            // 存储当前动画的ID
+            this.animation = requestAnimationFrame(animate);
         }
 
-        earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
-
-        // 存储当前动画的ID
-        earthRotateAnimation = requestAnimationFrame(animate);
-    }
-
-    animate()// 开始新的动画
-}
-
-let isMouseDown = false //当前鼠标按下状态
-
-const handleMouseDown = (e) => {
-    isMouseDown = true
-    const point = getMouseOnEarthPoint(e)
-    if (point) {
-        mouseDownPoint.copy(point) //鼠标按下时对应地球表面的三位向量点
+        animate()// 开始新的动画
     }
 }
-const handleMouseUp = (e) => {
-    isMouseDown = false
-    const point = getMouseOnEarthPoint(e)
-    if (point) {
-        mouseUpPoint.copy(point) //鼠标抬起时对应地球表面的三位向量点
-        // 计算旋转
-        rotateEarthWithAnimation(mouseDownPoint, mouseUpPoint)
-    }
-}
-
-window.addEventListener('mousedown', handleMouseDown);
-window.addEventListener('mouseup', handleMouseUp);
+const earthRotate = new earthRotateControl({camera, sphere})
 
 
 // 动画
@@ -376,10 +396,8 @@ let baseAnimateion
 function animate() {
     baseAnimateion = requestAnimationFrame(animate);
 
-    // TWEEN.update() //刷新补间动画
-
     // 地球自转动画
-    // if (isMouseDown == false) {
+    // if (earthRotate.isMouseDown == false) {
     //     earth.rotation.y += 0.005;
     // }
 
@@ -450,23 +468,17 @@ onMounted(() => {
 onBeforeUnmount(() => {
     cancelAnimationFrame(baseAnimateion);// 停止动画循环
 
-    if (earthRotateAnimation) {
-        cancelAnimationFrame(earthRotateAnimation);
+    if (earthRotate.animation) {
+        cancelAnimationFrame(earthRotate.animation);
     }
 
     // 释放所有资源
-    disposeAll(scene);
-    renderer.dispose();
-    renderer.domElement.remove();
-    controls.dispose();
-    gui.destroy();
-
-    // 销毁tween补间动画
-    // TWEEN.removeAll();
-
-    // 清理事件监听
-    window.removeEventListener('mousedown', handleMouseDown);
-    window.removeEventListener('mouseup', handleMouseUp);
+    disposeAll(scene)
+    renderer.dispose()
+    renderer.domElement.remove()
+    controls.dispose()
+    gui.destroy()
+    earthRotate.destroy() //清理地球的旋转监听
 })
 </script>
 
