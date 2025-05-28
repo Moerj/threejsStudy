@@ -89,6 +89,7 @@ class Marker {
     index
     latitude
     longitude
+    animation
 
     // 创建贴合球面的标记点
     markerGeometry = new THREE.CircleGeometry(0.005, 32);
@@ -105,8 +106,13 @@ class Marker {
         opacity: 0.6
     });
 
+    marker = new THREE.Mesh(this.markerGeometry, this.markerMaterial);
+    ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial);
+    group = new THREE.Group().add(this.marker).add(this.ring)
+
     destroy(){
         // 1. 释放 Three.js 资源
+        cancelAnimationFrame(this.animation)
         this.markerGeometry.dispose()
         this.markerMaterial.dispose()
         this.ringGeometry.dispose()
@@ -117,50 +123,59 @@ class Marker {
         this.ringGeometry = null;
         this.markerMaterial = null;
         this.ringMaterial = null;
-        this.markerGroup = null;
+        this.group = null;
     }
     constructor(latitude, longitude, ringColor) {
         this.latitude = latitude
         this.longitude = longitude
         this.index = markers.length; // 保存当前marker的索引
-        const marker = new THREE.Mesh(this.markerGeometry, this.markerMaterial);
-        const ring = new THREE.Mesh(this.ringGeometry, this.ringMaterial);
 
+        // 圆环颜色
         if (ringColor) this.ringMaterial.color.setHex(ringColor)
 
-        marker.name = "marker";
-        marker._index = this.index
-
-        ring.name = "ring";
-        ring._index = this.index
-
-        this.markerGroup = new THREE.Group();
-        this.markerGroup.add(marker);
-        this.markerGroup.add(ring);
-
-        this.markerGroup.lookAt(0, 0, 0);
-        this.markerGroup.position.normalize().multiplyScalar(1.005);
-
+        // 设置点位坐标
         this.setPosition(latitude, longitude);
 
-        return this
+        // 圆环动画
+        const ringAnimation = ()=>{
+            this.animation = requestAnimationFrame(ringAnimation)
+
+            const ring = this.ring
+            
+            // 如果没有缩放方向属性，初始化为1（放大）
+            if (ring.scaleDirection === undefined) {
+                ring.scaleDirection = 1;
+            }
+
+            // 根据方向进行缩放
+            if (ring.scaleDirection === 1) {
+                ring.scale.x += 0.01;
+                ring.scale.y += 0.01;
+                if (ring.scale.x >= 1.5) {
+                    ring.scaleDirection = -1;
+                }
+            } else {
+                ring.scale.x -= 0.01;
+                ring.scale.y -= 0.01;
+                if (ring.scale.x <= 0.5) {
+                    ring.scaleDirection = 1;
+                }
+            }
+        }
+        ringAnimation()
     }
     setPosition(latitude, longitude) {
-        this.markerGroup.position.setFromSphericalCoords(
+        this.group.position.setFromSphericalCoords(
             1.005,
             THREE.MathUtils.degToRad(90 - latitude),
             THREE.MathUtils.degToRad(longitude)
         );
-        this.markerGroup.lookAt(0, 0, 0);
-    }
-    get() {
-        return this.markerGroup
+        this.group.lookAt(0, 0, 0);
     }
 }
 
 //飞线发射点
 markers[0] = new Marker(52.2, -1.8, 0xfb5108)
-// markers[0].get().getObjectByName('ring').material.color.setHex(0xfb5108)
 
 // 飞线终点
 markers[1] = new Marker(61, -32)
@@ -168,7 +183,7 @@ markers[2] = new Marker(32.24, 0)
 markers[3] = new Marker(50, 25)
 
 markers.forEach(marker => {
-    earth.add(marker.get())
+    earth.add(marker.group)
 });
 
 // 创建抛物线
@@ -195,7 +210,9 @@ class Parabola {
         transparent: true
     })
 
-    lineGroup = new THREE.Group()
+    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
+    glowLine = new Line2(this.glowGeometry, this.glowMaterial)
+    lineGroup = new THREE.Group().add(this.baseLine).add(this.glowLine)
 
     destroy(){
         this.animation && cancelAnimationFrame(this.animation)
@@ -239,12 +256,6 @@ class Parabola {
         */
         midPoint.normalize().multiplyScalar(1.2);
 
-        const baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
-        const glowLine = new Line2(this.glowGeometry, this.glowMaterial)
-
-        // 创建组合对象
-        this.lineGroup.add(baseLine);
-        this.lineGroup.add(glowLine);
 
         // 创建单一的曲线实例
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
@@ -279,11 +290,11 @@ class Parabola {
             }
 
             if (currentPoints.length > 0) {
-                glowLine.geometry.setFromPoints(currentPoints);
+                this.glowLine.geometry.setFromPoints(currentPoints);
             }
         }
         
-        glowLineAnimation();
+        glowLineAnimation()
     }
 }
 
@@ -294,21 +305,21 @@ for (let i = 1; i < markers.length; i++) {
         { latitude: markers[0].latitude, longitude: markers[0].longitude },//飞线起点
         { latitude: markers[i].latitude, longitude: markers[i].longitude } //飞线终点
     );
-    parabolas.push(parabola.lineGroup);
+    parabolas.push(parabola);
     earth.add(parabola.lineGroup);
 }
 
 // gui调试marker
-const markerPosition = {
-    latitude: 0,   // 纬度 (-90 到 90)
-    longitude: 0,  // 经度 (-180 到 180)
-};
-gui.add(markerPosition, 'latitude', -90, 90).onChange(() => {
-    markers[0].setPosition(markerPosition.latitude, markerPosition.longitude)
-});
-gui.add(markerPosition, 'longitude', -180, 180).onChange(() => {
-    markers[0].setPosition(markerPosition.latitude, markerPosition.longitude)
-});
+// const markerPosition = {
+//     latitude: 0,   // 纬度 (-90 到 90)
+//     longitude: 0,  // 经度 (-180 到 180)
+// };
+// gui.add(markerPosition, 'latitude', -90, 90).onChange(() => {
+//     markers[0].setPosition(markerPosition.latitude, markerPosition.longitude)
+// });
+// gui.add(markerPosition, 'longitude', -180, 180).onChange(() => {
+//     markers[0].setPosition(markerPosition.latitude, markerPosition.longitude)
+// })
 
 const axesHelper = new THREE.AxesHelper(2);
 scene.add(axesHelper);
@@ -476,30 +487,6 @@ let baseAnimateion
 function animate() {
     baseAnimateion = requestAnimationFrame(animate);
 
-    // 点位圆环动画
-    markers.forEach(marker => {
-        const ring = marker.get().getObjectByName('ring');
-        // 如果没有缩放方向属性，初始化为1（放大）
-        if (ring.scaleDirection === undefined) {
-            ring.scaleDirection = 1;
-        }
-
-        // 根据方向进行缩放
-        if (ring.scaleDirection === 1) {
-            ring.scale.x += 0.01;
-            ring.scale.y += 0.01;
-            if (ring.scale.x >= 1.5) {
-                ring.scaleDirection = -1;
-            }
-        } else {
-            ring.scale.x -= 0.01;
-            ring.scale.y -= 0.01;
-            if (ring.scale.x <= 0.5) {
-                ring.scaleDirection = 1;
-            }
-        }
-    });
-
     renderer.render(scene, camera);
 }
 animate()
@@ -518,10 +505,10 @@ onBeforeUnmount(() => {
 
     markers.forEach(marker => {
         marker.destroy()
-    });
+    })
     parabolas.forEach(parabola => {
         parabola.destroy()
-    });
+    })
 
     // 释放所有资源
     disposeAll(scene)
