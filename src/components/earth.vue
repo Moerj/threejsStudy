@@ -259,7 +259,7 @@ class Parabola {
 
         // 创建单一的曲线实例
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
-        const points = curve.getPoints(50);
+        const points = curve.getPoints(300);//采样点,少了会出现虚线
         const totalPoints = points.length;
 
         // 设置基础线的点
@@ -272,9 +272,9 @@ class Parabola {
         // 发光飞线动画
         let progress = -lengthPercentage; //发光线动画的起始进度,从startPoint往地球内部延长50%
         const speed = 0.005;
-        const glowLineAnimation = () => {
+        const animate = () => {
             
-            this.animation = requestAnimationFrame(glowLineAnimation);
+            this.animation = requestAnimationFrame(animate);
 
             progress += speed;
             if (progress >= 1) {
@@ -295,7 +295,7 @@ class Parabola {
             }
         }
         
-        glowLineAnimation()
+        animate()
     }
 }
 
@@ -487,143 +487,164 @@ const earthRotate = new earthRotateControl({camera, sphere, earth})
 
 // 路网线路
 class RouteLine {
-    animation = null
-
-    // 创建发光线段（使用同一条曲线的点）
+    animation = null    // 创建发光线段（使用同一条曲线的点）
     glowGeometry = new LineGeometry();
     glowMaterial = new LineMaterial({
         color: 0xf8a413,
-        linewidth: 5, // 增加线宽
-        vertexColors: false,
-        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+        linewidth: 1, // 增加线宽
+        vertexColors: false,        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
         dashed: false,
-        opacity: 1.0, // 设置为完全不透明
-        transparent: true,
-        depthTest: false,
-        blending: THREE.AdditiveBlending // 添加混合模式
-    })
-
-    // 定义发光点
-    dotGeometry = new THREE.CircleGeometry(0.008, 32);
-    dotMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8
-    });
-
-    // 添加基础弧线材质和几何体
+        opacity: 1.0,
+        transparent: true, // 启用透明度
+        // alphaToCoverage: true, // 启用抗锯齿
+        // usePatternTexture: false // 禁用纹理模式
+    })    // 添加基础弧线材质和几何体
     baseGeometry = new THREE.BufferGeometry()
     baseMaterial = new THREE.LineBasicMaterial({
         color: 0x666666,
         transparent: true,
         opacity: 0.2
     });
-    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
-
+    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)    
     glowLine = new Line2(this.glowGeometry, this.glowMaterial)
-    dot = new THREE.Mesh(this.dotGeometry, this.dotMaterial)
     // 将基础线条也加入组中
-    group = new THREE.Group().add(this.baseLine).add(this.glowLine).add(this.dot)
+    group = new THREE.Group().add(this.baseLine).add(this.glowLine)
 
     destroy() {
         cancelAnimationFrame(this.animation)
         
         this.glowGeometry.dispose()
         this.glowMaterial.dispose()
-        this.dotGeometry.dispose()
-        this.dotMaterial.dispose()
         this.baseGeometry.dispose()
         this.baseMaterial.dispose()
     }
 
-    constructor({ markers }) {
+    constructor({ routePoints }) {
+        const radius = 1.005
         // 将markers转换为三维坐标点,并稍微抬高
-        const basePoints = markers.map(marker => {
+        const basePoints = routePoints.map(p => {
             const point = new THREE.Vector3();
             point.setFromSphericalCoords(
-                1.005, // 基础球面半径
-                THREE.MathUtils.degToRad(90 - marker.latitude),
-                THREE.MathUtils.degToRad(marker.longitude)
+                radius, // 基础球面半径
+                THREE.MathUtils.degToRad(90 - p.latitude),
+                THREE.MathUtils.degToRad(p.longitude)
             );
             return point;
-        });
+        });        
+        // 创建直线路径
+        const mapToSphere = (point) => {
+            // 将点投影到球面上
+            point.normalize().multiplyScalar(radius);
+            return point;
+        };
 
-        // 为每两个点之间创建弧线路径
+        // 为每两个点之间创建直线路径，并映射到球面
         const curves = [];
         for (let i = 0; i < basePoints.length - 1; i++) {
             const startPoint = basePoints[i];
             const endPoint = basePoints[i + 1];
             
-            // 计算控制点
-            const midPoint = new THREE.Vector3()
-                .addVectors(startPoint, endPoint)
-                .multiplyScalar(0.5)
-                .normalize()
-                .multiplyScalar(1.08); // 增加弧线高度
-                
-            curves.push(new THREE.QuadraticBezierCurve3(
-                startPoint,
-                midPoint,
-                endPoint
-            ));
-        }
+            // 在两点之间创建更多的插值点，并将它们映射到球面上
+            const segmentPoints = [];
+            const segmentCount = 10; // 每段路径的插值点数
+            
+            for (let j = 0; j <= segmentCount; j++) {
+                const t = j / segmentCount;
+                const interpolatedPoint = new THREE.Vector3()
+                    .lerpVectors(startPoint, endPoint, t);
+                segmentPoints.push(mapToSphere(interpolatedPoint));
+            }
+            
+            // 创建CatmullRomCurve3曲线，它会平滑地穿过所有点
+            curves.push(new THREE.CatmullRomCurve3(segmentPoints));
+        }        // 创建完整的曲线路径
+        const fullCurve = new THREE.CatmullRomCurve3(basePoints);
+        const totalPoints = 800; // 增加采样点数以获得更平滑的效果
+        const points = fullCurve.getPoints(totalPoints);
+        
+        // 设置基础线路
+        this.baseGeometry.setFromPoints(points);
 
-        // 修改动画参数
-        let currentCurveIndex = 0;
+        // 设置发光线段参数
+        const lengthPercentage = 0.2; // 发光线段长度占总长度的比例
+        const glowLineLength = Math.floor(totalPoints * lengthPercentage);
         let progress = 0;
-        const speed = 0.005; // 增加速度
-        const lineLength = 0.3; // 发光线长度
+        const speed = 0.006; // 降低速度使动画更平滑        
 
         const animate = () => {
             this.animation = requestAnimationFrame(animate);
 
-            // 更新progress
             progress += speed;
-            if (progress >= 1) {
-                progress = 0;
-                currentCurveIndex = (currentCurveIndex + 1) % curves.length;
+            if (progress >= 1.2) { // 给出额外0.2的时间让线段完全消失
+                progress = -0.2; // 从-0.2开始，给出时间让线段逐渐出现
             }
 
-            const currentCurve = curves[currentCurveIndex];
+            // 计算当前发光线段的点
+            const currentPoints = [];
             
-            // 采集更密集的点
-            const linePoints = [];
-            // 计算当前点和尾部点
-            const currentPos = currentCurve.getPoint(progress);
-            const numPoints = 100; // 增加采样点数量
-            const step = lineLength / numPoints;
-
-            for (let i = 0; i < numPoints; i++) {
-                const t = progress - (i * step);
-                if (t >= 0) {
-                    linePoints.unshift(currentCurve.getPoint(t));
+            // 生成基础点
+            for (let i = 0; i < glowLineLength; i++) {
+                let t = progress + (i / totalPoints);
+                
+                // 只在有效范围内添加点
+                if (t >= 0 && t <= 1) {
+                    const point = fullCurve.getPoint(t);
+                    
+                    // 在接近终点时计算透明度
+                    if (progress > 0.8) {
+                        const opacity = 1 - (progress - 0.8) / 0.2;
+                        point.userData = { opacity };
+                    }
+                    
+                    currentPoints.push(point);
+                }
+            }            
+            
+            // 更新发光线的顶点和发光点
+            if (currentPoints.length > 0) {
+                this.glowLine.geometry.setFromPoints(currentPoints);                
+                // 设置整体透明度
+                if (progress > 0.8) {
+                    this.glowMaterial.opacity = 1 - (progress - 0.8) / 0.2;
+                } else if (progress < 0) {
+                    this.glowMaterial.opacity = (progress + 0.2) / 0.2;
+                } else {
+                    this.glowMaterial.opacity = 1;
                 }
             }
-
-            // 更新线段和点的位置
-            if (linePoints.length > 0) {
-                this.glowLine.geometry.setFromPoints(linePoints);
-                this.dot.position.copy(currentPos);
-                this.dot.lookAt(0, 0, 0);
-            }
-        };
+        }
 
         animate();
 
-        // 在创建完curves后，渲染完整的基础路径
-        const allPoints = [];
-        curves.forEach(curve => {
-            // 为每条曲线获取更多的点以使曲线更平滑
-            allPoints.push(...curve.getPoints(50));
-        });
-        this.baseGeometry.setFromPoints(allPoints);
     }
 }
 
-// 实例化路线，使用现有的markers作为测试点
+// 创建固定的路径点
+const generateFixedPoints = () => {
+    const points = [];
+    const count = 40; // 增加点的数量以获得更长的路径
+    
+    // 计算markers[1]和markers[2]的中心点
+    const centerLat = (markers[1].latitude + markers[2].latitude) / 2;
+    const centerLng = (markers[1].longitude + markers[2].longitude) / 2;
+    const range = 8; // 增加运动范围
+    
+    for (let i = 0; i < count; i++) {
+        // 生成螺旋形路径，同时添加正弦波动使路径更加曲折
+        const angle = (i / count) * Math.PI * 3; // 增加到3π使路径更长
+        const radius = (0.3 + (i / count) * 0.7) * range; // 基础半径0.3，逐渐增大到最大范围
+        const wave = Math.sin(angle * 2) * 2; // 添加正弦波动
+        
+        const longitude = centerLng + radius * Math.cos(angle);
+        const latitude = centerLat + radius * Math.sin(angle) + wave;
+        points.push({ latitude, longitude });
+    }
+    return points;
+};
+
+// 实例化路线，使用生成的固定点
 const routeLine = new RouteLine({
-    markers: [markers[1], markers[2], markers[3]]  // 使用已有的marker点
+    routePoints: generateFixedPoints()
 });
 earth.add(routeLine.group);
 
