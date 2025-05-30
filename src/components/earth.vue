@@ -487,7 +487,8 @@ const earthRotate = new earthRotateControl({camera, sphere, earth})
 
 // 路网线路
 class RouteLine {
-    animation = null    // 创建发光线段（使用同一条曲线的点）
+    animation = null    
+    
     glowGeometry = new LineGeometry();
     glowMaterial = new LineMaterial({
         color: 0xf8a413,
@@ -495,35 +496,33 @@ class RouteLine {
         vertexColors: false,        resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
         dashed: false,
         opacity: 1.0,
-        transparent: true, // 启用透明度
-        // alphaToCoverage: true, // 启用抗锯齿
-        // usePatternTexture: false // 禁用纹理模式
-    })    // 添加基础弧线材质和几何体
+        transparent: true, 
+    })    
+    
+    // 添加基础弧线材质和几何体
     baseGeometry = new THREE.BufferGeometry()
     baseMaterial = new THREE.LineBasicMaterial({
         color: 0x666666,
         transparent: true,
         opacity: 0.2
     });
+
     baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)    
     glowLine = new Line2(this.glowGeometry, this.glowMaterial)
-    // 将基础线条也加入组中
     group = new THREE.Group().add(this.baseLine).add(this.glowLine)
 
     destroy() {
         cancelAnimationFrame(this.animation)
-        
         this.glowGeometry.dispose()
         this.glowMaterial.dispose()
         this.baseGeometry.dispose()
         this.baseMaterial.dispose()
     }
-
     constructor({ routePoints }) {
-        const radius = 1.005
-        // 将markers转换为三维坐标点,并稍微抬高
+        const radius = 1.001
+        // 将经纬度数组转换为三维坐标点,并稍微抬高
         const basePoints = routePoints.map(p => {
-            const point = new THREE.Vector3();
+            let point = new THREE.Vector3();
             point.setFromSphericalCoords(
                 radius, // 基础球面半径
                 THREE.MathUtils.degToRad(90 - p.latitude),
@@ -531,35 +530,12 @@ class RouteLine {
             );
             return point;
         });        
-        // 创建直线路径
-        const mapToSphere = (point) => {
-            // 将点投影到球面上
-            point.normalize().multiplyScalar(radius);
-            return point;
-        };
 
-        // 为每两个点之间创建直线路径，并映射到球面
-        const curves = [];
-        for (let i = 0; i < basePoints.length - 1; i++) {
-            const startPoint = basePoints[i];
-            const endPoint = basePoints[i + 1];
-            
-            // 在两点之间创建更多的插值点，并将它们映射到球面上
-            const segmentPoints = [];
-            const segmentCount = 10; // 每段路径的插值点数
-            
-            for (let j = 0; j <= segmentCount; j++) {
-                const t = j / segmentCount;
-                const interpolatedPoint = new THREE.Vector3()
-                    .lerpVectors(startPoint, endPoint, t);
-                segmentPoints.push(mapToSphere(interpolatedPoint));
-            }
-            
-            // 创建CatmullRomCurve3曲线，它会平滑地穿过所有点
-            curves.push(new THREE.CatmullRomCurve3(segmentPoints));
-        }        // 创建完整的曲线路径
+        // 创建完整的曲线路径
         const fullCurve = new THREE.CatmullRomCurve3(basePoints);
-        const totalPoints = 800; // 增加采样点数以获得更平滑的效果
+
+        // 增加采样点数以获得更平滑的效果
+        const totalPoints = 500; 
         const points = fullCurve.getPoints(totalPoints);
         
         // 设置基础线路
@@ -589,24 +565,20 @@ class RouteLine {
                 // 只在有效范围内添加点
                 if (t >= 0 && t <= 1) {
                     const point = fullCurve.getPoint(t);
-                    
-                    // 在接近终点时计算透明度
-                    if (progress > 0.8) {
-                        const opacity = 1 - (progress - 0.8) / 0.2;
-                        point.userData = { opacity };
-                    }
-                    
                     currentPoints.push(point);
                 }
             }            
             
             // 更新发光线的顶点和发光点
             if (currentPoints.length > 0) {
-                this.glowLine.geometry.setFromPoints(currentPoints);                
-                // 设置整体透明度
+                this.glowLine.geometry.setFromPoints(currentPoints);      
+
+                // 调整透明度
                 if (progress > 0.8) {
+                    // 接近终点,逐渐消失
                     this.glowMaterial.opacity = 1 - (progress - 0.8) / 0.2;
                 } else if (progress < 0) {
+                    // 从起点开始,逐渐显现
                     this.glowMaterial.opacity = (progress + 0.2) / 0.2;
                 } else {
                     this.glowMaterial.opacity = 1;
