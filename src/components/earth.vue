@@ -260,14 +260,12 @@ class Parabola {
         // 创建单一的曲线实例
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint);
         const points = curve.getPoints(50);
+        const totalPoints = points.length;
 
         // 设置基础线的点
         this.baseGeometry.setFromPoints(points);
 
-        // 设置发光线长度
-        const totalPoints = points.length;
-
-        // 设置为总长度的一半
+        // 设置发光线为一半
         const lengthPercentage = 0.5
         const glowLineLength = Math.floor(totalPoints * lengthPercentage); 
 
@@ -286,9 +284,9 @@ class Parabola {
             const currentPoints = [];
             // 计算当前应该显示的点的数量
             for (let i = 0; i < glowLineLength; i++) {
-                const t = (progress + (i / totalPoints));
+                const t = (progress + (i / totalPoints)); 
                 if (t <= 1) {
-                    currentPoints.push(curve.getPoint(t));
+                    currentPoints.push(curve.getPoint(t));//当前t在 [-0.5, 1]之间,t = 0: 起点 (startPoint),t = 1: 终点 (endPoint),t=-0.5 曲线起点方向延伸50%
                 }
             }
 
