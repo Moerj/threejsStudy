@@ -266,10 +266,13 @@ class Parabola {
 
         // 设置发光线长度
         const totalPoints = points.length;
-        const glowLineLength = Math.floor(totalPoints * 0.5); // 设置为总长度的一半
+
+        // 设置为总长度的一半
+        const glowLinePercentage = 0.5
+        const glowLineLength = Math.floor(totalPoints * glowLinePercentage); 
 
         // 发光飞线动画
-        let progress = 0;
+        let progress = -glowLinePercentage; //发光线动画的起始进度,从startPoint往地球内部延长50%
         const speed = 0.005;
         const glowLineAnimation = () => {
             
@@ -277,7 +280,7 @@ class Parabola {
 
             progress += speed;
             if (progress >= 1) {
-                progress = 0;
+                progress = -glowLinePercentage;
             }
 
             const currentPoints = [];
@@ -370,7 +373,7 @@ class earthRotateControl {
             //鼠标抬起时对应地球表面的三位向量点
             this.#mouseUpPoint.copy(point) 
             // 计算旋转
-            this.rotateEarthWithAnimation(this.#mouseDownPoint, this.#mouseUpPoint)
+            this.rotateEarth(this.#mouseDownPoint, this.#mouseUpPoint)
         }
     }
 
@@ -391,7 +394,7 @@ class earthRotateControl {
 
             this.rotateSelfAnimation = requestAnimationFrame(rotateSelf)
         }
-        rotateSelf()
+        // rotateSelf()
     }
     destroy() {
         window.removeEventListener('mousedown', this.#handleMouseDown);
@@ -416,7 +419,10 @@ class earthRotateControl {
         }
         return null;
     }
-    rotateEarthWithAnimation = (start, end) => {
+    rotateEarth = (start, end) => {
+
+        const earth = earthRotateControl.outData.earth
+
         // 如果存在正在进行的动画，立即取消
         if (this.controlAnimation) {
             cancelAnimationFrame(this.controlAnimation);
@@ -469,7 +475,6 @@ class earthRotateControl {
                 return;
             }
 
-            const earth = earthRotateControl.outData.earth
             earth.rotateOnAxis(rotationAxis, angle * speed * deltaTime);
 
             this.#isControlAnimating = true
