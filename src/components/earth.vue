@@ -268,11 +268,11 @@ class Parabola {
         const totalPoints = points.length;
 
         // 设置为总长度的一半
-        const glowLinePercentage = 0.5
-        const glowLineLength = Math.floor(totalPoints * glowLinePercentage); 
+        const lengthPercentage = 0.5
+        const glowLineLength = Math.floor(totalPoints * lengthPercentage); 
 
         // 发光飞线动画
-        let progress = -glowLinePercentage; //发光线动画的起始进度,从startPoint往地球内部延长50%
+        let progress = -lengthPercentage; //发光线动画的起始进度,从startPoint往地球内部延长50%
         const speed = 0.005;
         const glowLineAnimation = () => {
             
@@ -280,7 +280,7 @@ class Parabola {
 
             progress += speed;
             if (progress >= 1) {
-                progress = -glowLinePercentage;
+                progress = -lengthPercentage;
             }
 
             const currentPoints = [];
