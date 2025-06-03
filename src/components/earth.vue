@@ -569,7 +569,7 @@ class RouteLine {
                 }
             }
 
-            // 更新发光线的顶点和发光点
+            // 更新发光线
             if (currentPoints.length > 0) {
                 this.glowLine.geometry.setFromPoints(currentPoints)
 
