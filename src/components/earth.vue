@@ -147,17 +147,18 @@ class Marker {
                 ring.scaleDirection = 1
             }
 
-            // 根据方向进行缩放
             if (ring.scaleDirection === 1) {
+                // 圆环扩大
                 ring.scale.x += 0.01
                 ring.scale.y += 0.01
-                if (ring.scale.x >= 1.5) {
+                if (ring.scale.x >= 1.5) { //扩大到1.5倍后开始缩小
                     ring.scaleDirection = -1
                 }
             } else {
+                //圆环缩小
                 ring.scale.x -= 0.01
                 ring.scale.y -= 0.01
-                if (ring.scale.x <= 0.5) {
+                if (ring.scale.x <= 0.5) { //缩小到0.5倍后开始扩大
                     ring.scaleDirection = 1
                 }
             }
@@ -165,12 +166,14 @@ class Marker {
         ringAnimation()
     }
     setPosition(latitude, longitude) {
+
+        // 设置点位在地球表面上的坐标 (从球坐标中的radius、phi和theta设置该向量。)
         this.group.position.setFromSphericalCoords(
-            1.005,
-            THREE.MathUtils.degToRad(90 - latitude),
-            THREE.MathUtils.degToRad(longitude)
+            1.005, //radius弧面高度
+            THREE.MathUtils.degToRad(90 - latitude), //phi,与 y (up) 轴的极角 （以弧度为单位）
+            THREE.MathUtils.degToRad(longitude) //theta,绕 y (up) 轴的赤道角(方位角)（以弧度为单位）。 
         )
-        this.group.lookAt(0, 0, 0)
+        this.group.lookAt(0, 0, 0) //调整点位的方向
     }
 }
 
@@ -190,7 +193,7 @@ markers.forEach(marker => {
 class Parabola {
     animation = null
 
-    // 创建基础曲线
+    // 基础曲线材质
     baseGeometry = new THREE.BufferGeometry()
     baseMaterial = new THREE.LineBasicMaterial({
         color: 'rgb(179, 207, 255)',
@@ -198,7 +201,7 @@ class Parabola {
         opacity: 0.2
     });
 
-    // 创建发光线段（使用同一条曲线的点）
+    // 发光线段材质
     glowGeometry = new LineGeometry();
     glowMaterial = new LineMaterial({
         color: 0x14fb2f,
@@ -210,8 +213,12 @@ class Parabola {
         transparent: true
     })
 
-    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial)
-    glowLine = new Line2(this.glowGeometry, this.glowMaterial)
+    //基础曲线(代表整个飞线的运动轨迹)
+    baseLine = new THREE.Line(this.baseGeometry, this.baseMaterial) 
+
+    //发光的飞线
+    glowLine = new Line2(this.glowGeometry, this.glowMaterial) 
+
     lineGroup = new THREE.Group().add(this.baseLine).add(this.glowLine)
 
     destroy() {
@@ -245,7 +252,7 @@ class Parabola {
             THREE.MathUtils.degToRad(endPosition.longitude)
         )
 
-        // 计算控制点
+        // 中间点
         const midPoint = new THREE.Vector3().addVectors(startPoint, endPoint).multiplyScalar(0.5)
         /*想象一下：
         如果两点在地球表面
@@ -254,23 +261,25 @@ class Parabola {
         multiplyScalar(1.2) 会继续往外拉伸20%
         这样就形成了一个向外凸起的控制点，使得飞线呈现弧形
         */
-        midPoint.normalize().multiplyScalar(1.2)
+        midPoint.normalize().multiplyScalar(1.2) //将中间点抬高,形成弧线
 
 
-        // 创建单一的曲线实例
+        // 创建一条平滑的三维 二次贝塞尔曲线， 由起点、终点和一个控制点所定义。
         const curve = new THREE.QuadraticBezierCurve3(startPoint, midPoint, endPoint)
-        const points = curve.getPoints(300)//采样点,少了会出现虚线
+
+        //采样点,少了会出现虚线
+        const points = curve.getPoints(300)
         const totalPoints = points.length
 
-        // 设置基础线的点
+        // 根据采样点绘制基础线
         this.baseGeometry.setFromPoints(points)
 
-        // 设置发光线为一半
-        const lengthPercentage = 0.5
-        const glowLineLength = Math.floor(totalPoints * lengthPercentage)
+        // 定义发光线段的长度
+        const lengthPercentage = 0.5 //这里定义为基础线长的一半
+        const glowLineTotalPoint = Math.floor(totalPoints * lengthPercentage)
 
         // 发光飞线动画
-        let progress = -lengthPercentage //发光线动画的起始进度,从startPoint往地球内部延长50%
+        let progress = -lengthPercentage //发光线动画的动画进度, -0.5 ~ 1 ,从startPoint往地球内部延长50%
         const speed = 0.005
         const animate = () => {
 
@@ -283,13 +292,15 @@ class Parabola {
 
             const currentPoints = []
             // 计算当前应该显示的点的数量
-            for (let i = 0; i < glowLineLength; i++) {
+            for (let i = 0; i < glowLineTotalPoint; i++) {
+                //当前t在 [-0.5, 1]之间,t=-0.5 曲线起点方向延伸50%,t = 0: 起点 (startPoint),t = 1: 终点 (endPoint)
                 const t = (progress + (i / totalPoints))
                 if (t <= 1) {
-                    currentPoints.push(curve.getPoint(t))//当前t在 [-0.5, 1]之间,t = 0: 起点 (startPoint),t = 1: 终点 (endPoint),t=-0.5 曲线起点方向延伸50%
+                    currentPoints.push(curve.getPoint(t))
                 }
             }
 
+            // 更新发光飞线的动画位置
             if (currentPoints.length > 0) {
                 this.glowLine.geometry.setFromPoints(currentPoints)
             }
